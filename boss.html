@@ -112,9 +112,9 @@ select option{background:#161b22;}
 
   <div class="kpi-grid">
     <div class="kpi"><div class="kpi-label">손호영 마진</div><div class="kpi-val y" id="k-son-m">-</div></div>
-    <div class="kpi"><div class="kpi-label">박귀빈 마진</div><div class="kpi-val y" id="k-bak-m">-</div></div>
+    <div class="kpi"><div class="kpi-label">박기빈 마진</div><div class="kpi-val y" id="k-bak-m">-</div></div>
     <div class="kpi"><div class="kpi-label">손호영 폐유수입</div><div class="kpi-val b" id="k-son-w">-</div></div>
-    <div class="kpi"><div class="kpi-label">박귀빈 폐유수입</div><div class="kpi-val b" id="k-bak-w">-</div></div>
+    <div class="kpi"><div class="kpi-label">박기빈 폐유수입</div><div class="kpi-val b" id="k-bak-w">-</div></div>
     <div class="kpi"><div class="kpi-label">이달 총수익</div><div class="kpi-val g" id="k-total">-</div></div>
     <div class="kpi"><div class="kpi-label">미수잔액</div><div class="kpi-val r" id="k-misu">-</div></div>
   </div>
@@ -123,7 +123,7 @@ select option{background:#161b22;}
   <div class="sec-label">시재 현황</div>
   <div class="info-box">
     <div class="info-row"><span class="il">손호영 전달현금</span><span class="iv y" id="sj-son">-</span></div>
-    <div class="info-row"><span class="il">박귀빈 전달현금</span><span class="iv y" id="sj-bak">-</span></div>
+    <div class="info-row"><span class="il">박기빈 전달현금</span><span class="iv y" id="sj-bak">-</span></div>
     <div class="info-row"><span class="il">합계</span><span class="iv" id="sj-tot">-</span></div>
   </div>
 
@@ -175,7 +175,7 @@ select option{background:#161b22;}
   <div class="month-row" style="margin-bottom:10px">
     <input type="month" id="hist-month" onchange="loadHistoryAll()" style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;">
     <select id="hist-emp" onchange="loadHistoryAll()" style="flex:0.7;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;">
-      <option value="">전체</option><option>손호영</option><option>박귀빈</option>
+      <option value="">전체</option><option>손호영</option><option>박기빈</option>
     </select>
   </div>
   <!-- 서브탭 -->
@@ -399,12 +399,12 @@ function parseTx(r){
 
 function renderDashboard(){
   const son=allTx.filter(t=>t.직원==='손호영');
-  const bak=allTx.filter(t=>t.직원==='박귀빈');
+  const bak=allTx.filter(t=>t.직원==='박기빈');
   const sum=(a,k)=>a.reduce((s,t)=>s+(t[k]||0),0);
   const fmt=n=>n.toLocaleString()+'원';
 
   const sonWI=allWaste.filter(w=>w.직원==='손호영').reduce((s,w)=>s+(+w.폐유수입||0),0);
-  const bakWI=allWaste.filter(w=>w.직원==='박귀빈').reduce((s,w)=>s+(+w.폐유수입||0),0);
+  const bakWI=allWaste.filter(w=>w.직원==='박기빈').reduce((s,w)=>s+(+w.폐유수입||0),0);
 
   document.getElementById('k-son-m').textContent=fmt(sum(son,'식유마진'));
   document.getElementById('k-bak-m').textContent=fmt(sum(bak,'식유마진'));
@@ -428,7 +428,7 @@ function renderDashboard(){
   const settlEl=document.getElementById('settlement-list');
   const empList=[
     {name:'손호영', 전달:sd},
-    {name:'박귀빈', 전달:bd}
+    {name:'박기빈', 전달:bd}
   ];
   settlEl.innerHTML=empList.map(e=>`
     <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">

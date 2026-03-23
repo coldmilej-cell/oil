@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>박귀빈 - 식용유 유통</title>
+<title>박기빈 - 식용유 유통</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
 :root{
@@ -145,9 +145,9 @@ select option{background:#181c24;}
 
   <div class="divider"></div>
 
-  <div class="sec-label">🚛 오늘 상차</div>
+  <div class="sec-label">🚗 오늘 방문</div>
   <div id="cargo-list"></div>
-  <button class="btn-add" onclick="addCargo()">+ 거래처 추가</button>
+  <button class="btn-add" onclick="addCargo()">+ 방문 거래처 추가</button>
 
   <div id="stock-summary" style="display:none;margin-top:12px">
     <div class="sec-label">📦 실을 것 요약</div>
@@ -214,11 +214,23 @@ select option{background:#181c24;}
         <div class="toggle-sw" id="waste-toggle"></div>
       </div>
       <div id="waste-fields" style="display:none;margin-top:10px">
-        <div class="grid2">
-          <div class="inp-wrap" style="margin:0"><label>실중량 (kg)</label><input class="inp" type="number" id="w-kg" placeholder="0.0" step="0.1" inputmode="decimal" oninput="calcDelivery()"></div>
-          <div class="inp-wrap" style="margin:0"><label>매입단가 (원/kg)</label><input class="inp" type="number" id="w-price" placeholder="0" inputmode="numeric" oninput="calcDelivery()"></div>
+        <!-- 입력 방식 토글 -->
+        <div style="display:flex;gap:6px;margin-bottom:10px">
+          <div id="waste-mode-calc" onclick="setWasteMode('calc')" style="flex:1;padding:9px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:rgba(108,143,255,.1);color:var(--p);border:1.5px solid var(--p)">kg × 단가</div>
+          <div id="waste-mode-direct" onclick="setWasteMode('direct')" style="flex:1;padding:9px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--t3);border:1.5px solid var(--border)">금액 직접입력</div>
         </div>
-        <div style="font-size:11px;color:var(--t2);margin-top:6px">※ 수거한 폐유 → 내일 출근탭에서 납품</div>
+        <!-- kg × 단가 방식 -->
+        <div id="waste-calc-fields">
+          <div class="grid2">
+            <div class="inp-wrap" style="margin:0"><label>실중량 (kg)</label><input class="inp" type="number" id="w-kg" placeholder="0.0" step="0.1" inputmode="decimal" oninput="calcDelivery()"></div>
+            <div class="inp-wrap" style="margin:0"><label>매입단가 (원/kg)</label><input class="inp" type="number" id="w-price" placeholder="0" inputmode="numeric" step="10" oninput="calcDelivery()"></div>
+          </div>
+        </div>
+        <!-- 금액 직접입력 방식 -->
+        <div id="waste-direct-fields" style="display:none">
+          <div class="inp-wrap" style="margin:0"><label>폐유 지급액 (원)</label><input class="inp" type="number" id="w-direct" placeholder="0" inputmode="numeric" step="10" oninput="calcDelivery()"></div>
+        </div>
+        <div style="font-size:11px;color:var(--t2);margin-top:8px">※ 수거한 폐유 → 내일 출근탭에서 납품</div>
       </div>
     </div>
 
@@ -235,7 +247,7 @@ select option{background:#181c24;}
     <div id="pay-buttons"></div>
     <div class="inp-wrap" id="pay-amount-wrap" style="display:none">
       <label id="pay-amount-label">수금액 (원)</label>
-      <input class="inp" type="number" id="pay-amount" placeholder="0" inputmode="numeric">
+      <input class="inp" type="number" id="pay-amount" placeholder="0" inputmode="numeric" step="10">
     </div>
     <div class="inp-wrap"><label>비고</label><input class="inp" type="text" id="d-note" placeholder="특이사항"></div>
     <button class="btn-primary" onclick="saveDelivery()">저장</button>
@@ -248,7 +260,7 @@ select option{background:#181c24;}
   <div class="card">
     <div class="inp-wrap"><label>거래처 *</label><select class="inp" id="pay-store"><option value="">선택...</option></select></div>
     <div class="grid2">
-      <div class="inp-wrap"><label>입금액 *</label><input class="inp" type="number" id="pay-amt" placeholder="0" inputmode="numeric"></div>
+      <div class="inp-wrap"><label>입금액 *</label><input class="inp" type="number" id="pay-amt" placeholder="0" inputmode="numeric" step="10"></div>
       <div class="inp-wrap"><label>방법</label><select class="inp" id="pay-method"><option>계좌이체</option><option>현금</option></select></div>
     </div>
     <div class="inp-wrap"><label>입금자명</label><input class="inp" type="text" id="pay-payer" placeholder="통장에 찍히는 이름"></div>
@@ -298,8 +310,9 @@ select option{background:#181c24;}
       <div class="inp-wrap"><label>방문요일 *</label>
         <select class="inp" id="ns-day"><option value="">선택</option><option>월</option><option>화</option><option>수</option><option>목</option><option>금</option></select>
       </div>
-      <div class="inp-wrap"><label>주 유종</label><select class="inp" id="ns-type"><option value="">선택</option></select></div>
+      <div class="inp-wrap"><label>주 유종 (선택)</label><select class="inp" id="ns-type"><option value="">없음</option></select></div>
     </div>
+    <div class="inp-wrap"><label>사장 연락처</label><input class="inp" id="ns-phone" type="tel" placeholder="010-0000-0000"></div>
     <div class="inp-wrap"><label>입금자명</label><input class="inp" id="ns-payer" type="text" placeholder="통장에 찍히는 이름"></div>
     <div class="inp-wrap"><label>특이사항</label><input class="inp" id="ns-note" type="text"></div>
     <div class="modal-btns">
@@ -313,7 +326,7 @@ select option{background:#181c24;}
 
 <script>
 const API='https://script.google.com/macros/s/AKfycbxx1H1Ich2nsHf3iNEpC3NajRuCYkcrBf7C5ok_jVrtzAmO4ZrbnJNjLw-J8B99SCId/exec';
-const EMP='박귀빈';
+const EMP='박기빈';
 const DAYS=['일','월','화','수','목','금','토'];
 
 // ── 데이터 ──
@@ -334,13 +347,26 @@ function today(){return new Date().toISOString().slice(0,10);}
 // ── 단가 시점 조회 ──
 function getPriceAt(품명,날짜){
   const target=new Date(날짜);
+  let best=null,bestDate=null,bestEntry=null;
+  priceHistory.forEach(p=>{
+    if(p.품명!==품명)return;
+    const d=new Date(p.날짜);
+    if(d<=target&&(!bestDate||d>=bestDate)){bestDate=d;best=+p.출고가;bestEntry=p;}
+  });
+  return best;
+}
+function getItemType(품명,날짜){
+  const target=new Date(날짜);
   let best=null,bestDate=null;
   priceHistory.forEach(p=>{
     if(p.품명!==품명)return;
     const d=new Date(p.날짜);
-    if(d<=target&&(!bestDate||d>=bestDate)){bestDate=d;best=+p.출고가;}
+    if(d<=target&&(!bestDate||d>=bestDate)){bestDate=d;best=p.구분||'';}
   });
-  return best;
+  return best||'';
+}
+function isFeeItem(품명,날짜){
+  return getItemType(품명,날짜)==='수수료';
 }
 function getWastePriceAt(날짜){
   const target=new Date(날짜);
@@ -508,6 +534,22 @@ function addCargo(){
     </div>`;
   document.getElementById('cargo-list').appendChild(el);
 }
+function setCargoMode(id, mode){
+  const modes=['oil','waste','both'];
+  const ids=[`cm-oil-${id}`,`cm-waste-${id}`,`cm-both-${id}`];
+  ids.forEach((el,i)=>{
+    const active=modes[i]===mode;
+    document.getElementById(el).style.background=active?'rgba(108,143,255,.1)':'var(--card2)';
+    document.getElementById(el).style.color=active?'var(--p)':'var(--t3)';
+    document.getElementById(el).style.borderColor=active?'var(--p)':'var(--border)';
+  });
+  document.getElementById(`oil-fields-${id}`).style.display=(mode==='waste')?'none':'block';
+  document.getElementById(`waste-mark-${id}`).style.display=(mode==='oil')?'none':'block';
+  const c=cargos.find(x=>x.id===id);
+  if(c)c.cargoMode=mode;
+  calcStockSummary();
+}
+
 function onCargoStoreChange(id){
   const name=document.getElementById(`cs-${id}`).value;
   const s=stores.find(x=>x.이름===name);
@@ -839,8 +881,26 @@ function calcItem(id){
   const calcEl=document.getElementById(`ic-${id}`);
   if(qty>0&&price>0&&cost>0){
     calcEl.style.display='block';
-    document.getElementById(`im-${id}`).textContent=`${(price-cost).toLocaleString()}원/통 × ${qty}통 = ${(qty*(price-cost)).toLocaleString()}원`;
+    if(isFeeItem(type,today())){
+      document.getElementById(`im-${id}`).textContent=`수수료 ${cost.toLocaleString()}원/통 × ${qty}통 = ${(qty*cost).toLocaleString()}원 (청구없음)`;
+    } else {
+      document.getElementById(`im-${id}`).textContent=`${(price-cost).toLocaleString()}원/통 × ${qty}통 = ${(qty*(price-cost)).toLocaleString()}원`;
+    }
   } else calcEl.style.display='none';
+  calcDelivery();
+}
+
+let wasteModeCalc = true;
+function setWasteMode(mode){
+  wasteModeCalc = mode === 'calc';
+  document.getElementById('waste-mode-calc').style.background = wasteModeCalc?'rgba(108,143,255,.1)':'var(--card2)';
+  document.getElementById('waste-mode-calc').style.color = wasteModeCalc?'var(--p)':'var(--t3)';
+  document.getElementById('waste-mode-calc').style.borderColor = wasteModeCalc?'var(--p)':'var(--border)';
+  document.getElementById('waste-mode-direct').style.background = !wasteModeCalc?'rgba(108,143,255,.1)':'var(--card2)';
+  document.getElementById('waste-mode-direct').style.color = !wasteModeCalc?'var(--p)':'var(--t3)';
+  document.getElementById('waste-mode-direct').style.borderColor = !wasteModeCalc?'var(--p)':'var(--border)';
+  document.getElementById('waste-calc-fields').style.display = wasteModeCalc?'block':'none';
+  document.getElementById('waste-direct-fields').style.display = !wasteModeCalc?'block':'none';
   calcDelivery();
 }
 
@@ -856,12 +916,27 @@ function updatePayButtons(){
   const isWasteOnly=!hasOil&&wasteOn;
   const container=document.getElementById('pay-buttons');
   if(isWasteOnly){
-    container.innerHTML=`<div class="pay-row"><div class="pay-btn danger" onclick="selPay(this,'현금지급')">현금지급</div><div class="pay-btn danger" onclick="selPay(this,'이체지급')">이체지급</div></div>`;
+    container.innerHTML=`
+      <div style="font-size:11px;color:var(--o);margin-bottom:6px;font-weight:600">💸 우리가 지급하는 방향</div>
+      <div class="pay-row">
+        <div class="pay-btn danger" onclick="selPay(this,'현금지급')">현금으로 지급</div>
+        <div class="pay-btn danger" onclick="selPay(this,'이체지급')">계좌로 지급</div>
+      </div>`;
   } else {
-    container.innerHTML=`<div class="pay-row"><div class="pay-btn" onclick="selPay(this,'현금')">현금</div><div class="pay-btn danger" onclick="selPay(this,'미수')">미수</div></div>
-    <div class="pay-row"><div class="pay-btn danger" onclick="selPay(this,'반품')" style="grid-column:span 2">↩️ 반품 (미수차감)</div></div>`;
+    container.innerHTML=`
+      <div class="pay-row" style="margin-bottom:6px">
+        <div class="pay-btn danger on" onclick="selPay(this,'미수')" style="grid-column:span 2;padding:16px;font-size:15px">미수 (나중에 입금)</div>
+      </div>
+      <div class="pay-row">
+        <div class="pay-btn" onclick="selPay(this,'현금')">현금결제 (현장수령)</div>
+        <div class="pay-btn" onclick="selPay(this,'반품')" style="color:var(--r)">↩️ 반품</div>
+      </div>`;
+    curPay='미수';
   }
-  curPay='';document.getElementById('pay-amount-wrap').style.display='none';
+  // 미수가 기본값
+  const defaultPay=isWasteOnly?'':'미수';
+  curPay=defaultPay;
+  document.getElementById('pay-amount-wrap').style.display='none';
 }
 
 function selPay(el,p){
@@ -874,25 +949,47 @@ function selPay(el,p){
 }
 
 function calcDelivery(){
-  const oilTotal=items.reduce((s,i)=>s+i.qty*i.price,0);
-  const oilMargin=items.reduce((s,i)=>s+i.qty*(i.price-(getPriceAt(i.type,today())||0)),0);
-  const wasteKg=wasteOn?(parseFloat(document.getElementById('w-kg')?.value)||0):0;
-  const wastePriceVal=wasteOn?(parseFloat(document.getElementById('w-price')?.value)||0):0;
-  const wastePay=Math.round(wasteKg*wastePriceVal);
+  // 수수료 품목: 차감청구=0, 수익=통수×수수료단가
+  const oilTotal=items.reduce((s,i)=>{
+    if(isFeeItem(i.type,today())) return s; // 수수료는 청구 안함
+    return s+i.qty*i.price;
+  },0);
+  const feeTotal=items.reduce((s,i)=>{
+    if(!isFeeItem(i.type,today())) return s;
+    return s+i.qty*(getPriceAt(i.type,today())||0); // 수수료단가 × 통수
+  },0);
+  const oilMargin=items.reduce((s,i)=>{
+    if(isFeeItem(i.type,today())) return s+i.qty*(getPriceAt(i.type,today())||0);
+    return s+i.qty*(i.price-(getPriceAt(i.type,today())||0));
+  },0);
+  let wasteKg=0, wastePriceVal=0, wastePay=0, wasteRev=0;
+  if(wasteOn){
+    if(wasteModeCalc){
+      wasteKg=parseFloat(document.getElementById('w-kg')?.value)||0;
+      wastePriceVal=parseFloat(document.getElementById('w-price')?.value)||0;
+      wastePay=Math.round(wasteKg*wastePriceVal);
+    } else {
+      wastePay=parseFloat(document.getElementById('w-direct')?.value)||0;
+      wasteKg=0; wastePriceVal=0;
+    }
+    const wcp=getWastePriceAt(today());
+    wasteRev=wasteModeCalc?Math.round(wasteKg*Math.max(0,wcp-wastePriceVal)):0;
+  }
   const wcp=getWastePriceAt(today());
-  const wasteRev=Math.round(wasteKg*Math.max(0,wcp-wastePriceVal));
   const charge=oilTotal-wastePay;
   const box=document.getElementById('delivery-result');
-  if(oilTotal>0||wasteKg>0){
+  if(oilTotal>0||wasteKg>0||wastePay>0){
     box.style.display='block';
     document.getElementById('dr-oil').textContent=oilTotal.toLocaleString()+'원';
     const fi=items.find(i=>i.qty>0);
     document.getElementById('dr-margin').textContent=fi?`${(fi.price-(getPriceAt(fi.type,today())||0)).toLocaleString()}원/통`:'-';
-    document.getElementById('dr-waste-pay').textContent=wastePay>0?wastePay.toLocaleString()+'원':'-';
+    document.getElementById('dr-waste-pay').textContent=(wasteOn&&wastePay>0)?wastePay.toLocaleString()+'원':'-';
     const chargeEl=document.getElementById('dr-charge');
     chargeEl.textContent=charge.toLocaleString()+'원';
     chargeEl.style.color=charge<0?'var(--r)':'var(--y)';
-    document.getElementById('dr-waste-rev').textContent=wasteRev>0?wasteRev.toLocaleString()+'원':'-';
+    // 직접입력 모드일때 폐유수익 표시 안함
+    document.getElementById('dr-waste-rev').textContent=(wasteRev>0)?wasteRev.toLocaleString()+'원':(!wasteModeCalc&&wasteOn?'별도계산':'-');
+    // dr-waste-rev는 위에서 처리
     document.getElementById('dr-total').textContent=(oilMargin+wasteRev).toLocaleString()+'원';
   } else box.style.display='none';
   updatePayButtons();
@@ -904,13 +1001,25 @@ async function saveDelivery(){
   if(!curPay){showToast('수금방법을 선택해주세요');return;}
   const t=today();
   const storeName=curStore?.이름||document.getElementById('chip-name').textContent||'임시거래처';
-  const oilTotal=items.reduce((s,i)=>s+i.qty*i.price,0);
-  const oilMargin=items.reduce((s,i)=>s+i.qty*(i.price-(getPriceAt(i.type,t)||0)),0);
-  const wasteKg=wasteOn?(parseFloat(document.getElementById('w-kg')?.value)||0):0;
-  const wastePriceVal=wasteOn?(parseFloat(document.getElementById('w-price')?.value)||0):0;
-  const wastePay=Math.round(wasteKg*wastePriceVal);
+  const oilTotal=items.reduce((s,i)=>isFeeItem(i.type,t)?s:s+i.qty*i.price,0);
+  const feeTotal=items.reduce((s,i)=>!isFeeItem(i.type,t)?s:s+i.qty*(getPriceAt(i.type,t)||0),0);
+  const oilMargin=items.reduce((s,i)=>{
+    if(isFeeItem(i.type,t)) return s+i.qty*(getPriceAt(i.type,t)||0);
+    return s+i.qty*(i.price-(getPriceAt(i.type,t)||0));
+  },0);
+  let wasteKg=0, wastePriceVal=0, wastePay=0, wasteRev=0;
+  if(wasteOn){
+    if(wasteModeCalc){
+      wasteKg=parseFloat(document.getElementById('w-kg')?.value)||0;
+      wastePriceVal=parseFloat(document.getElementById('w-price')?.value)||0;
+      wastePay=Math.round(wasteKg*wastePriceVal);
+    } else {
+      wastePay=parseFloat(document.getElementById('w-direct')?.value)||0;
+    }
+    const wcp2=getWastePriceAt(t);
+    wasteRev=wasteModeCalc?Math.round(wasteKg*Math.max(0,wcp2-wastePriceVal)):0;
+  }
   const wcp=getWastePriceAt(t);
-  const wasteRev=Math.round(wasteKg*Math.max(0,wcp-wastePriceVal));
   const charge=oilTotal-wastePay;
   const payAmt=parseFloat(document.getElementById('pay-amount')?.value)||0;
   const tx={
@@ -1059,7 +1168,7 @@ function renderHistory(){
 // ══════════════ 신규 거래처 ══════════════
 function openNewStore(name){
   document.getElementById('ns-name').value=name;
-  ['ns-day','ns-type','ns-payer','ns-note'].forEach(id=>document.getElementById(id).value='');
+  ['ns-day','ns-type','ns-phone','ns-payer','ns-note'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ns-sub').textContent=`"${name}"을(를) 새 거래처로 추가합니다`;
   document.getElementById('new-store-modal').classList.add('show');
 }
@@ -1070,6 +1179,7 @@ async function saveNewStore(){
   if(!이름||!요일){showToast('필수 항목을 입력해주세요');return;}
   const s={코드:'C'+Date.now(),이름,담당:EMP,요일,
     유종:document.getElementById('ns-type').value,
+    연락처:document.getElementById('ns-phone').value.trim(),
     입금자:document.getElementById('ns-payer').value.trim(),
     비고:document.getElementById('ns-note').value.trim()};
   stores.push(s);

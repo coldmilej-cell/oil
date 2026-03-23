@@ -1,0 +1,1092 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>손호영 - 식용유 유통</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+:root{
+  --bg:#0f1117;--card:#181c24;--card2:#1e2330;--border:#2a2f3d;
+  --p:#6c8fff;--p2:#3d5af1;--g:#3ddc84;--y:#ffd166;--r:#ff6b6b;--o:#ff9f43;
+  --t:#e8eaf0;--t2:#7a7f94;--t3:#3a3f52;--R:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--t);min-height:100vh;max-width:440px;margin:0 auto;}
+.tabs{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--border);display:flex;}
+.tab{flex:1;padding:13px 2px;text-align:center;font-size:10px;font-weight:600;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;}
+.tab.on{color:var(--p);border-bottom-color:var(--p);}
+.page{display:none;padding:16px 16px 80px;}
+.page.on{display:block;}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--t3);text-transform:uppercase;margin-bottom:10px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--R);padding:14px;margin-bottom:10px;}
+.divider{height:1px;background:var(--border);margin:12px 0;}
+.inp-wrap{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
+.inp-wrap label{font-size:11px;color:var(--t2);font-weight:500;}
+.inp{width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:12px 13px;color:var(--t);font-size:14px;font-family:'Noto Sans KR',sans-serif;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none;}
+.inp:focus{border-color:var(--p);}
+.inp::placeholder{color:var(--t3);}
+.inp[type=number]{font-family:'JetBrains Mono',monospace;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.btn-primary{width:100%;padding:15px;background:var(--p2);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer;transition:all .2s;margin-top:4px;}
+.btn-primary:active{transform:scale(.98);}
+.btn-danger{padding:8px 12px;background:rgba(255,107,107,.12);border:none;border-radius:8px;color:var(--r);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
+.btn-add{width:100%;padding:12px;background:transparent;border:2px dashed var(--border);border-radius:10px;color:var(--t3);font-size:13px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .2s;margin-top:4px;}
+.btn-add:hover{border-color:var(--p);color:var(--p);}
+/* 수금버튼 */
+.pay-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;}
+.pay-btn{padding:13px;border:1.5px solid var(--border);border-radius:10px;background:var(--card2);color:var(--t2);font-size:13px;font-weight:600;cursor:pointer;text-align:center;transition:all .15s;font-family:'Noto Sans KR',sans-serif;}
+.pay-btn.on{border-color:var(--p);background:rgba(108,143,255,.1);color:var(--p);}
+.pay-btn.danger.on{border-color:var(--r);background:rgba(255,107,107,.1);color:var(--r);}
+/* 결과박스 */
+.result-box{background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:13px;margin:10px 0;}
+.result-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;}
+.result-row:not(:last-child){border-bottom:1px solid var(--border);}
+.rl{font-size:12px;color:var(--t2);}
+.rv{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;}
+.rv.y{color:var(--y);}.rv.g{color:var(--g);}.rv.r{color:var(--r);}.rv.p{color:var(--p);}.rv.big{font-size:17px;}
+/* 파레트 */
+.pallet-card{background:var(--card2);border:1.5px solid var(--border);border-radius:12px;padding:13px;margin-bottom:8px;}
+/* 상차카드 */
+.cargo-card{background:var(--card2);border:1.5px solid var(--border);border-radius:12px;padding:13px;margin-bottom:8px;}
+/* 유종합산 */
+.stock-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:10px;}
+.stock-item{background:rgba(108,143,255,.06);border:1px solid rgba(108,143,255,.15);border-radius:10px;padding:10px 12px;text-align:center;}
+.stock-type{font-size:11px;color:var(--t2);margin-bottom:4px;}
+.stock-qty{font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;color:var(--p);}
+.stock-cost{font-size:10px;color:var(--t3);margin-top:2px;}
+/* 루트 */
+.route-item{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 13px;margin-bottom:8px;display:flex;align-items:center;gap:10px;transition:opacity .2s;}
+.route-item.done{opacity:.5;border-style:dashed;}
+.route-item.dragging{opacity:.3;}
+.route-order{width:28px;height:28px;border-radius:50%;background:var(--p2);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.route-info{flex:1;cursor:pointer;}
+.route-name{font-size:14px;font-weight:700;}
+.route-meta{font-size:11px;color:var(--t2);margin-top:2px;}
+.drag-handle{color:var(--t3);font-size:20px;padding:4px 6px;cursor:grab;touch-action:none;}
+/* 품목카드 */
+.item-card{background:var(--card2);border:1.5px solid var(--border);border-radius:12px;padding:13px;margin-bottom:8px;}
+.item-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+.item-badge{font-size:11px;font-weight:700;color:var(--p);background:rgba(108,143,255,.1);padding:3px 8px;border-radius:6px;}
+.item-calc{margin-top:8px;padding:8px 10px;background:rgba(108,143,255,.06);border:1px solid rgba(108,143,255,.15);border-radius:8px;font-size:12px;color:var(--t2);}
+.item-calc span{color:var(--p);font-weight:700;font-family:'JetBrains Mono',monospace;}
+/* 검색 */
+.search-results{background:var(--card);border:1.5px solid var(--border);border-radius:12px;margin-top:6px;display:none;overflow:hidden;}
+.search-item{padding:12px 14px;cursor:pointer;border-bottom:1px solid var(--border);}
+.search-item:last-child{border-bottom:none;}
+.search-item:active{background:var(--card2);}
+.search-name{font-size:14px;font-weight:600;}
+.search-meta{font-size:11px;color:var(--t2);margin-top:2px;}
+.search-new{padding:12px 14px;cursor:pointer;color:var(--g);font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px;}
+.store-chip{background:rgba(108,143,255,.08);border:1.5px solid rgba(108,143,255,.25);border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;}
+/* 토글 */
+.toggle-row{display:flex;justify-content:space-between;align-items:center;cursor:pointer;}
+.toggle-sw{width:44px;height:24px;background:var(--border);border-radius:12px;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle-sw.on{background:var(--o);}
+.toggle-sw::after{content:'';position:absolute;width:18px;height:18px;background:#fff;border-radius:50%;top:3px;left:3px;transition:left .2s;}
+.toggle-sw.on::after{left:23px;}
+.toggle-sw-sm{width:38px;height:20px;background:var(--border);border-radius:10px;position:relative;transition:background .2s;flex-shrink:0;}
+.toggle-sw-sm.on{background:var(--o);}
+.toggle-sw-sm::after{content:'';position:absolute;width:14px;height:14px;background:#fff;border-radius:50%;top:3px;left:3px;transition:left .2s;}
+.toggle-sw-sm.on::after{left:21px;}
+/* 내역 */
+.tx-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:8px;}
+.tx-top{display:flex;justify-content:space-between;margin-bottom:6px;}
+.tx-store{font-size:14px;font-weight:700;}
+.tx-date{font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace;}
+.tx-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:6px 0;}
+.tx-detail{font-size:11px;color:var(--t2);}
+.tx-detail span{color:var(--t);font-weight:500;}
+.tx-bottom{display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border);margin-top:6px;}
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;}
+.badge.r{background:rgba(255,107,107,.12);color:var(--r);}
+.badge.g{background:rgba(61,220,132,.12);color:var(--g);}
+/* 모달 */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;align-items:flex-end;justify-content:center;}
+.modal-bg.show{display:flex;}
+.modal{background:var(--card);border-radius:20px 20px 0 0;padding:22px 18px 40px;width:100%;max-width:440px;max-height:90vh;overflow-y:auto;}
+.modal-title{font-size:17px;font-weight:900;margin-bottom:4px;}
+.modal-sub{font-size:12px;color:var(--t2);margin-bottom:18px;}
+.modal-btns{display:flex;gap:8px;margin-top:14px;}
+.btn-cancel{flex:1;padding:13px;background:var(--card2);border:1.5px solid var(--border);border-radius:11px;color:var(--t2);font-size:14px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
+.btn-ok{flex:2;padding:13px;background:var(--p2);border:none;border-radius:11px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
+.page-hdr{padding:14px 0 4px;display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.page-title{font-size:18px;font-weight:900;}
+.empty{text-align:center;padding:40px 20px;color:var(--t3);}
+.empty-icon{font-size:36px;margin-bottom:10px;}
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--g);color:#000;padding:11px 22px;border-radius:100px;font-size:13px;font-weight:700;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+select option{background:#181c24;}
+</style>
+</head>
+<body>
+<div class="tabs">
+  <div class="tab on"  onclick="goTab('checkin')">🌅 출근</div>
+  <div class="tab"     onclick="goTab('delivery')">📦 납품</div>
+  <div class="tab"     onclick="goTab('payment')">💳 입금</div>
+  <div class="tab"     onclick="goTab('history')">📋 내역</div>
+</div>
+
+<!-- 출근 -->
+<div class="page on" id="page-checkin">
+  <div class="page-hdr">
+    <div><div class="page-title">🌅 출근</div><div style="font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace" id="ci-date"></div></div>
+    <div id="sync-status" style="font-size:11px;color:var(--t3)">⏳</div>
+  </div>
+
+  <div class="sec-label">♻️ 폐유 납품</div>
+  <div id="pallet-list"></div>
+  <button class="btn-add" onclick="addPallet()">+ 파레트 추가</button>
+  <div class="result-box" id="waste-total-box" style="display:none;margin-top:10px">
+    <div class="result-row"><span class="rl">총 실중량</span><span class="rv p" id="wt-kg">-</span></div>
+    <div class="result-row"><span class="rl">회사 매입단가</span><span class="rv" id="wt-price">-</span></div>
+    <div class="result-row"><span class="rl">💰 폐유수입</span><span class="rv g big" id="wt-income">-</span></div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="sec-label">🚛 오늘 상차</div>
+  <div id="cargo-list"></div>
+  <button class="btn-add" onclick="addCargo()">+ 거래처 추가</button>
+
+  <div id="stock-summary" style="display:none;margin-top:12px">
+    <div class="sec-label">📦 실을 것 요약</div>
+    <div class="stock-grid" id="stock-grid"></div>
+    <div class="result-box" style="margin-top:8px">
+      <div class="result-row"><span class="rl">총 원가</span><span class="rv y" id="st-cost">-</span></div>
+      <div class="result-row"><span class="rl">총 통수</span><span class="rv" id="st-qty">-</span></div>
+    </div>
+  </div>
+
+  <div style="height:12px"></div>
+  <button class="btn-primary" onclick="saveCheckin()">저장</button>
+
+  <div id="checkin-history" style="display:none;margin-top:20px">
+    <div class="divider"></div>
+    <div class="sec-label">오늘 저장된 내역</div>
+    <div id="checkin-history-content"></div>
+  </div>
+</div>
+
+<!-- 납품 -->
+<div class="page" id="page-delivery">
+  <!-- 루트 목록 -->
+  <div id="route-section">
+    <div class="page-hdr">
+      <div><div class="page-title">📦 납품</div><div style="font-size:11px;color:var(--t3)" id="delivery-day-label"></div></div>
+      <div style="font-size:12px;font-weight:700;color:var(--g)" id="route-progress"></div>
+    </div>
+    <div id="route-list"></div>
+    <button class="btn-add" style="margin-top:4px" onclick="showDeliveryForm(null)">+ 신규 / 추가 납품</button>
+  </div>
+
+  <!-- 납품 입력 폼 -->
+  <div id="delivery-form" style="display:none;padding-top:14px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+      <div>
+        <div style="font-size:16px;font-weight:900" id="form-title">납품 입력</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:2px" id="form-meta"></div>
+      </div>
+      <button class="btn-danger" onclick="hideDeliveryForm()">← 목록</button>
+    </div>
+
+    <div id="store-search-area" style="display:none">
+      <div class="inp-wrap"><label>거래처 검색</label>
+        <input class="inp" id="store-q" type="text" placeholder="거래처명 검색..." oninput="onSearch()" autocomplete="off">
+      </div>
+      <div class="search-results" id="search-results"></div>
+    </div>
+    <div id="store-selected-area" style="display:none">
+      <div class="store-chip">
+        <div><div class="store-chip-name" id="chip-name"></div><div style="font-size:11px;color:var(--t2);margin-top:2px" id="chip-meta"></div></div>
+        <div class="btn-danger" onclick="clearStore()">✕</div>
+      </div>
+    </div>
+
+    <div class="sec-label">납품 품목</div>
+    <div id="item-list"></div>
+    <button class="btn-add" onclick="addItem()">+ 품목 추가</button>
+
+    <div class="divider"></div>
+    <div class="card">
+      <div class="toggle-row" onclick="toggleWaste()">
+        <span style="font-size:13px;font-weight:700;color:var(--o)">♻️ 폐유 수거 있음</span>
+        <div class="toggle-sw" id="waste-toggle"></div>
+      </div>
+      <div id="waste-fields" style="display:none;margin-top:10px">
+        <div class="grid2">
+          <div class="inp-wrap" style="margin:0"><label>실중량 (kg)</label><input class="inp" type="number" id="w-kg" placeholder="0.0" step="0.1" inputmode="decimal" oninput="calcDelivery()"></div>
+          <div class="inp-wrap" style="margin:0"><label>매입단가 (원/kg)</label><input class="inp" type="number" id="w-price" placeholder="0" inputmode="numeric" oninput="calcDelivery()"></div>
+        </div>
+        <div style="font-size:11px;color:var(--t2);margin-top:6px">※ 수거한 폐유 → 내일 출근탭에서 납품</div>
+      </div>
+    </div>
+
+    <div class="result-box" id="delivery-result" style="display:none">
+      <div class="result-row"><span class="rl">식유금액</span><span class="rv" id="dr-oil">-</span></div>
+      <div class="result-row"><span class="rl">통당 마진</span><span class="rv p" id="dr-margin">-</span></div>
+      <div class="result-row"><span class="rl">폐유 지급액</span><span class="rv r" id="dr-waste-pay">-</span></div>
+      <div class="result-row"><span class="rl">🧾 차감 후 청구</span><span class="rv y big" id="dr-charge">-</span></div>
+      <div class="result-row"><span class="rl">폐유 수익</span><span class="rv g" id="dr-waste-rev">-</span></div>
+      <div class="result-row"><span class="rl">✅ 총 수익</span><span class="rv g big" id="dr-total">-</span></div>
+    </div>
+
+    <div class="sec-label">수금 방법</div>
+    <div id="pay-buttons"></div>
+    <div class="inp-wrap" id="pay-amount-wrap" style="display:none">
+      <label id="pay-amount-label">수금액 (원)</label>
+      <input class="inp" type="number" id="pay-amount" placeholder="0" inputmode="numeric">
+    </div>
+    <div class="inp-wrap"><label>비고</label><input class="inp" type="text" id="d-note" placeholder="특이사항"></div>
+    <button class="btn-primary" onclick="saveDelivery()">저장</button>
+  </div>
+</div>
+
+<!-- 입금 -->
+<div class="page" id="page-payment">
+  <div class="page-hdr"><div class="page-title">💳 입금 입력</div></div>
+  <div class="card">
+    <div class="inp-wrap"><label>거래처 *</label><select class="inp" id="pay-store"><option value="">선택...</option></select></div>
+    <div class="grid2">
+      <div class="inp-wrap"><label>입금액 *</label><input class="inp" type="number" id="pay-amt" placeholder="0" inputmode="numeric"></div>
+      <div class="inp-wrap"><label>방법</label><select class="inp" id="pay-method"><option>계좌이체</option><option>현금</option></select></div>
+    </div>
+    <div class="inp-wrap"><label>입금자명</label><input class="inp" type="text" id="pay-payer" placeholder="통장에 찍히는 이름"></div>
+    <div class="inp-wrap"><label>비고</label><input class="inp" type="text" id="pay-note"></div>
+  </div>
+  <button class="btn-primary" onclick="savePayment()">입금 저장</button>
+  <div style="margin-top:20px">
+    <div class="sec-label">오늘 입금 내역</div>
+    <div id="today-payment-list"></div>
+  </div>
+
+  <div style="margin-top:20px">
+    <div class="sec-label">💰 오늘 정산</div>
+    <div id="settlement-box" style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:16px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--t2)">현금 수령</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700" id="settle-cash">0원</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+        <span style="font-size:12px;color:var(--t2)">폐유 현금지급</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--r)" id="settle-waste">0원</span>
+      </div>
+      <div style="height:1px;background:var(--border);margin:10px 0"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:13px;font-weight:700">사장님께 전달</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:900;color:var(--y)" id="settle-total">0원</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 내역 -->
+<div class="page" id="page-history">
+  <div class="page-hdr">
+    <div><div class="page-title">📋 내 내역</div><div style="font-size:11px;color:var(--t3)" id="hist-month-label"></div></div>
+  </div>
+  <div id="history-list"></div>
+</div>
+
+<!-- 신규 거래처 모달 -->
+<div class="modal-bg" id="new-store-modal" onclick="if(event.target===this)closeModal('new-store-modal')">
+  <div class="modal">
+    <div class="modal-title">신규 거래처 추가</div>
+    <div class="modal-sub" id="ns-sub"></div>
+    <div class="inp-wrap"><label>거래처명 *</label><input class="inp" id="ns-name" type="text"></div>
+    <div class="grid2">
+      <div class="inp-wrap"><label>방문요일 *</label>
+        <select class="inp" id="ns-day"><option value="">선택</option><option>월</option><option>화</option><option>수</option><option>목</option><option>금</option></select>
+      </div>
+      <div class="inp-wrap"><label>주 유종</label><select class="inp" id="ns-type"><option value="">선택</option></select></div>
+    </div>
+    <div class="inp-wrap"><label>입금자명</label><input class="inp" id="ns-payer" type="text" placeholder="통장에 찍히는 이름"></div>
+    <div class="inp-wrap"><label>특이사항</label><input class="inp" id="ns-note" type="text"></div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal('new-store-modal')">취소</button>
+      <button class="btn-ok" onclick="saveNewStore()">추가하고 선택</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API='https://script.google.com/macros/s/AKfycbxx1H1Ich2nsHf3iNEpC3NajRuCYkcrBf7C5ok_jVrtzAmO4ZrbnJNjLw-J8B99SCId/exec';
+const EMP='손호영';
+const DAYS=['일','월','화','수','목','금','토'];
+
+// ── 데이터 ──
+let stores=JSON.parse(localStorage.getItem('stores_v3')||'[]');
+let priceHistory=JSON.parse(localStorage.getItem('priceHistory_v3')||'[]');
+let wastePriceHistory=JSON.parse(localStorage.getItem('wastePriceHistory_v3')||'[]');
+let txList=JSON.parse(localStorage.getItem(`tx_${EMP}_v3`)||'[]');
+let todayPayments=JSON.parse(localStorage.getItem(`pay_${EMP}_today`)||'[]');
+let completedRoutes=JSON.parse(localStorage.getItem(`done_${EMP}_${today()}`)||'[]');
+let routeOrder=JSON.parse(localStorage.getItem(`route_order_${EMP}`)||'[]');
+
+// ── 상태 ──
+let pallets=[],cargos=[],items=[],wasteOn=false,curStore=null,curPay='';
+let palletId=0,cargoId=0,itemId=0;
+
+function today(){return new Date().toISOString().slice(0,10);}
+
+// ── 단가 시점 조회 ──
+function getPriceAt(품명,날짜){
+  const target=new Date(날짜);
+  let best=null,bestDate=null;
+  priceHistory.forEach(p=>{
+    if(p.품명!==품명)return;
+    const d=new Date(p.날짜);
+    if(d<=target&&(!bestDate||d>=bestDate)){bestDate=d;best=+p.출고가;}
+  });
+  return best;
+}
+function getWastePriceAt(날짜){
+  const target=new Date(날짜);
+  let best=1540,bestDate=null;
+  wastePriceHistory.forEach(p=>{
+    const d=new Date(p.날짜);
+    if(d<=target&&(!bestDate||d>=bestDate)){bestDate=d;best=+p.단가;}
+  });
+  return best;
+}
+function getTypeOptions(){
+  const types=[...new Set(priceHistory.map(p=>p.품명))];
+  return types.length?types:['하이골드','그린마켓','해표','노블대두','영미카놀라','영미대두','교촌전용','자담치킨','삼동소바','호치킨','인정후라이드','고추기름','호일'];
+}
+
+// ── 초기화 ──
+async function init(){
+  const now=new Date();
+  document.getElementById('ci-date').textContent=`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} (${DAYS[now.getDay()]})`;
+  document.getElementById('delivery-day-label').textContent=`${DAYS[now.getDay()]}요일 루트`;
+  const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('hist-month-label').textContent=ym;
+
+  try{
+    const [sr,pr]=await Promise.all([fetch(API+'?type=stores'),fetch(API+'?type=prices')]);
+    const sd=await sr.json(),pd=await pr.json();
+    if(sd.stores?.length){
+      stores=sd.stores.map(s=>({코드:s.코드||'',이름:s.이름||'',담당:s.담당||'',요일:s.요일||'',유종:s.유종||'',입금자:s.입금자||'',비고:s.비고||''}));
+      localStorage.setItem('stores_v3',JSON.stringify(stores));
+    }
+    if(pd.prices?.length){
+      priceHistory=pd.prices.filter(p=>p.품명&&p.품명!=='폐유매입단가').map(p=>({품명:p.품명,출고가:+p.출고가,날짜:String(p.적용일자).slice(0,10)}));
+      wastePriceHistory=pd.prices.filter(p=>p.품명==='폐유매입단가').map(p=>({단가:+p.출고가,날짜:String(p.적용일자).slice(0,10)}));
+      localStorage.setItem('priceHistory_v3',JSON.stringify(priceHistory));
+      localStorage.setItem('wastePriceHistory_v3',JSON.stringify(wastePriceHistory));
+    }
+    document.getElementById('sync-status').textContent='✅';
+  }catch(e){document.getElementById('sync-status').textContent='📴';}
+
+  buildNsTypeOptions();
+  buildPayStore();
+  renderRoute();
+  renderCheckinHistory();
+  renderTodayPayments();
+  renderHistory();
+}
+
+function buildNsTypeOptions(){
+  const ns=document.getElementById('ns-type');
+  ns.innerHTML='<option value="">선택</option>';
+  getTypeOptions().forEach(t=>{const o=document.createElement('option');o.value=t;o.textContent=t;ns.appendChild(o);});
+}
+function buildPayStore(){
+  const sel=document.getElementById('pay-store');
+  sel.innerHTML='<option value="">선택...</option>';
+  stores.forEach(s=>{const o=document.createElement('option');o.value=s.이름;o.textContent=`${s.이름} (${s.요일})`;sel.appendChild(o);});
+}
+
+// ── 탭 ──
+function goTab(t){
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',['checkin','delivery','payment','history'][i]===t));
+  document.querySelectorAll('.page').forEach((el,i)=>el.classList.toggle('on',['page-checkin','page-delivery','page-payment','page-history'][i]===`page-${t}`));
+  if(t==='delivery'){hideDeliveryForm();renderRoute();}
+  if(t==='payment'){renderTodayPayments();calcSettlement();}
+  if(t==='history')renderHistory();
+}
+
+// ══════════════ 출근 ══════════════
+// ── 파레트 ──
+function addPallet(){
+  const id=++palletId;
+  pallets.push({id,기존있음:false,기존중량:0,기존캔:0,총중량:0,캔수:0,실중량:0});
+  const el=document.createElement('div');
+  el.className='pallet-card';el.id=`pallet-${id}`;
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:12px;font-weight:700;color:var(--o)">♻️ 파레트 ${id}</span>
+      <button class="btn-danger" onclick="removePallet(${id})">✕</button>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;margin-bottom:8px" onclick="togglePalletExist(${id})">
+      <span style="font-size:12px;color:var(--t2)">기존 캔 있음</span>
+      <div class="toggle-sw-sm" id="pe-sw-${id}"></div>
+    </div>
+    <div id="pe-fields-${id}" style="display:none;margin-bottom:8px">
+      <div class="grid2">
+        <div class="inp-wrap" style="margin:0"><label>기존 중량 (kg)</label><input class="inp" type="number" id="p${id}-ek" value="0" inputmode="decimal" oninput="calcPallet(${id})"></div>
+        <div class="inp-wrap" style="margin:0"><label>기존 캔수</label><input class="inp" type="number" id="p${id}-ec" value="0" inputmode="numeric" oninput="calcPallet(${id})"></div>
+      </div>
+    </div>
+    <div class="grid2">
+      <div class="inp-wrap" style="margin:0"><label>총 중량 (kg) *</label><input class="inp" type="number" id="p${id}-tk" placeholder="0" inputmode="decimal" oninput="calcPallet(${id})"></div>
+      <div class="inp-wrap" style="margin:0"><label>내린 캔수 *</label><input class="inp" type="number" id="p${id}-tc" placeholder="0" inputmode="numeric" oninput="calcPallet(${id})"></div>
+    </div>
+    <div id="p${id}-res" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(61,220,132,.06);border:1px solid rgba(61,220,132,.15);border-radius:8px;display:none;justify-content:space-between">
+      <span style="font-size:11px;color:var(--t2)">실중량</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700" id="p${id}-real">-</span>
+    </div>`;
+  document.getElementById('pallet-list').appendChild(el);
+}
+function togglePalletExist(id){
+  const p=pallets.find(x=>x.id===id);if(!p)return;
+  p.기존있음=!p.기존있음;
+  document.getElementById(`pe-sw-${id}`).classList.toggle('on',p.기존있음);
+  document.getElementById(`pe-fields-${id}`).style.display=p.기존있음?'block':'none';
+  calcPallet(id);
+}
+function removePallet(id){pallets=pallets.filter(p=>p.id!==id);document.getElementById(`pallet-${id}`)?.remove();calcWasteTotal();}
+function calcPallet(id){
+  const p=pallets.find(x=>x.id===id);if(!p)return;
+  const ek=p.기존있음?(parseFloat(document.getElementById(`p${id}-ek`)?.value)||0):0;
+  const ec=p.기존있음?(parseFloat(document.getElementById(`p${id}-ec`)?.value)||0):0;
+  const tk=parseFloat(document.getElementById(`p${id}-tk`)?.value)||0;
+  const tc=parseFloat(document.getElementById(`p${id}-tc`)?.value)||0;
+  const real=p.기존있음?tk-ek-tc:tk-20-tc;
+  p.기존중량=ek;p.기존캔=ec;p.총중량=tk;p.캔수=tc;p.실중량=real;
+  const resEl=document.getElementById(`p${id}-res`);
+  const realEl=document.getElementById(`p${id}-real`);
+  if(tk>0&&tc>0){
+    resEl.style.display='flex';
+    realEl.textContent=`${real.toFixed(1)}kg`;
+    realEl.style.color=real<0?'var(--r)':'var(--g)';
+  } else resEl.style.display='none';
+  calcWasteTotal();
+}
+function calcWasteTotal(){
+  const vp=pallets.filter(p=>p.총중량>0);
+  const totalReal=vp.reduce((s,p)=>s+p.실중량,0);
+  const wcp=getWastePriceAt(today());
+  const income=Math.round(totalReal*wcp);
+  const box=document.getElementById('waste-total-box');
+  if(vp.length>0){
+    box.style.display='block';
+    document.getElementById('wt-kg').textContent=totalReal.toFixed(1)+'kg';
+    document.getElementById('wt-price').textContent=wcp.toLocaleString()+'원/kg';
+    document.getElementById('wt-income').textContent=income.toLocaleString()+'원';
+  } else box.style.display='none';
+}
+
+// ── 상차 ──
+function addCargo(){
+  const id=++cargoId;
+  cargos.push({id,거래처:'',유종:'',통수:0});
+  const el=document.createElement('div');
+  el.className='cargo-card';el.id=`cargo-${id}`;
+  const today_day=DAYS[new Date().getDay()];
+  const storeOpts=stores.filter(s=>s.요일===today_day).map(s=>`<option value="${s.이름}">${s.이름}</option>`).join('');
+  const typeOpts=getTypeOptions().map(t=>`<option value="${t}">${t}</option>`).join('');
+  el.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+      <span style="font-size:12px;font-weight:700;color:var(--o)">상차 ${id}</span>
+      <button class="btn-danger" onclick="removeCargo(${id})">✕</button>
+    </div>
+    <div class="inp-wrap"><label>거래처 (선택사항)</label>
+      <select class="inp" id="cs-${id}" onchange="onCargoStoreChange(${id})">
+        <option value="">선택 안함</option>${storeOpts}
+      </select>
+    </div>
+    <div class="grid2">
+      <div class="inp-wrap" style="margin:0"><label>유종 *</label>
+        <select class="inp" id="ct-${id}" onchange="calcStockSummary()"><option value="">선택</option>${typeOpts}</select>
+      </div>
+      <div class="inp-wrap" style="margin:0"><label>통수 *</label>
+        <input class="inp" type="number" id="cq-${id}" placeholder="0" inputmode="numeric" oninput="calcStockSummary()">
+      </div>
+    </div>`;
+  document.getElementById('cargo-list').appendChild(el);
+}
+function onCargoStoreChange(id){
+  const name=document.getElementById(`cs-${id}`).value;
+  const s=stores.find(x=>x.이름===name);
+  if(s?.유종)document.getElementById(`ct-${id}`).value=s.유종;
+  const c=cargos.find(x=>x.id===id);if(c)c.거래처=name;
+  calcStockSummary();
+}
+function removeCargo(id){cargos=cargos.filter(c=>c.id!==id);document.getElementById(`cargo-${id}`)?.remove();calcStockSummary();}
+function calcStockSummary(){
+  const stockMap={};let totalCost=0,totalQty=0;
+  cargos.forEach(c=>{
+    const type=document.getElementById(`ct-${c.id}`)?.value||'';
+    const qty=parseFloat(document.getElementById(`cq-${c.id}`)?.value)||0;
+    const store=document.getElementById(`cs-${c.id}`)?.value||'';
+    c.거래처=store;c.유종=type;c.통수=qty;
+    if(!type||!qty)return;
+    if(!stockMap[type])stockMap[type]=0;
+    stockMap[type]+=qty;
+    totalCost+=(getPriceAt(type,today())||0)*qty;
+    totalQty+=qty;
+  });
+  const sec=document.getElementById('stock-summary');
+  if(totalQty===0){sec.style.display='none';return;}
+  sec.style.display='block';
+  document.getElementById('stock-grid').innerHTML=Object.entries(stockMap).sort((a,b)=>b[1]-a[1]).map(([type,qty])=>`
+    <div class="stock-item">
+      <div class="stock-type">${type}</div>
+      <div class="stock-qty">${qty}통</div>
+      <div class="stock-cost">${((getPriceAt(type,today())||0)*qty).toLocaleString()}원</div>
+    </div>`).join('');
+  document.getElementById('st-cost').textContent=totalCost.toLocaleString()+'원';
+  document.getElementById('st-qty').textContent=totalQty+'통';
+}
+
+async function saveCheckin(){
+  const validPallets=pallets.filter(p=>p.총중량>0&&p.캔수>0);
+  const validCargos=cargos.filter(c=>c.통수>0);
+  if(!validPallets.length&&!validCargos.length){showToast('폐유납품 또는 상차를 입력해주세요');return;}
+  const wcp=getWastePriceAt(today());
+  const totalReal=validPallets.reduce((s,p)=>s+p.실중량,0);
+  const income=Math.round(totalReal*wcp);
+  const t=today();
+  try{
+    if(validPallets.length>0){
+      const delivery={id:Date.now(),날짜:t,직원:EMP,파레트수:validPallets.length,총실중량:totalReal,매입단가:wcp,폐유수입:income,파레트목록:validPallets};
+      await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'waste_delivery',delivery})});
+    }
+    for(const c of validCargos){
+      await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({type:'cargo',cargo:{id:Date.now()+Math.random(),날짜:t,직원:EMP,거래처:c.거래처||'',유종:c.유종,통수:c.통수}})});
+    }
+    // 상차 로컬 저장 (납품탭 연동)
+    const savedCargos=validCargos.map(c=>({거래처:c.거래처,유종:c.유종,통수:c.통수}));
+    localStorage.setItem(`cargo_today_${EMP}`,JSON.stringify(savedCargos));
+    // 출근 로그
+    const log=JSON.parse(localStorage.getItem(`checkin_log_${EMP}_${t}`)||'[]');
+    log.push({id:Date.now(),폐유:{파레트수:validPallets.length,실중량:totalReal,수입:income},상차:savedCargos});
+    localStorage.setItem(`checkin_log_${EMP}_${t}`,JSON.stringify(log));
+    showToast('✅ 저장됐어요!');
+    pallets=[];cargos=[];palletId=0;cargoId=0;
+    document.getElementById('pallet-list').innerHTML='';
+    document.getElementById('cargo-list').innerHTML='';
+    document.getElementById('waste-total-box').style.display='none';
+    document.getElementById('stock-summary').style.display='none';
+    renderCheckinHistory();
+    renderRoute(); // 납품탭 루트도 갱신
+  }catch(e){showToast('⚠️ 저장 실패');}
+}
+
+// ── 출근 내역 ──
+function renderCheckinHistory(){
+  const t=today();
+  const logs=JSON.parse(localStorage.getItem(`checkin_log_${EMP}_${t}`)||'[]');
+  const sec=document.getElementById('checkin-history');
+  const el=document.getElementById('checkin-history-content');
+  if(!logs.length){sec.style.display='none';return;}
+  sec.style.display='block';
+  // 유종별 합산
+  const stockMap={};let totalReal=0,totalIncome=0,totalPallets=0;
+  logs.forEach(log=>{
+    totalReal+=log.폐유.실중량||0;totalIncome+=log.폐유.수입||0;totalPallets+=log.폐유.파레트수||0;
+    log.상차.forEach(c=>{if(!c.유종||!c.통수)return;stockMap[c.유종]=(stockMap[c.유종]||0)+c.통수;});
+  });
+  const 폐유html=totalPallets>0?`
+    <div style="background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.2);border-radius:10px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+      <div><div style="font-size:11px;font-weight:700;color:var(--o);margin-bottom:2px">♻️ 폐유 납품</div>
+      <div style="font-size:12px;color:var(--t2)">파레트 ${totalPallets}개 · ${totalReal.toFixed(1)}kg</div></div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--g)">${totalIncome.toLocaleString()}원</div>
+    </div>`:''
+  const entries=Object.entries(stockMap);
+  const 상차html=entries.length?`
+    <div style="background:rgba(108,143,255,.06);border:1px solid rgba(108,143,255,.15);border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="font-size:11px;font-weight:700;color:var(--p);margin-bottom:8px">🚛 오늘 상차</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        ${entries.map(([type,qty])=>`
+          <div style="background:rgba(108,143,255,.08);border-radius:8px;padding:8px 10px;text-align:center">
+            <div style="font-size:11px;color:var(--t2)">${type}</div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--p)">${qty}통</div>
+          </div>`).join('')}
+      </div>
+    </div>`:'';
+  el.innerHTML=폐유html+상차html+`<button onclick="deleteAllCheckin()" style="width:100%;padding:8px;background:rgba(255,107,107,.1);border:none;border-radius:8px;color:var(--r);font-size:12px;font-weight:600;cursor:pointer;margin-top:4px">오늘 출근 내역 초기화</button>`;
+}
+function deleteAllCheckin(){
+  if(!confirm('오늘 출근 내역을 전부 삭제할까요?\n다시 입력해주세요.'))return;
+  const t=today();
+  localStorage.removeItem(`checkin_log_${EMP}_${t}`);
+  localStorage.removeItem(`cargo_today_${EMP}`);
+  showToast('삭제됐어요');
+  renderCheckinHistory();renderRoute();
+}
+
+// ══════════════ 납품 ══════════════
+// ── 루트 목록 (상차 기반) ──
+function getRouteList(){
+  const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
+  const today_day=DAYS[new Date().getDay()];
+  const skipped=JSON.parse(localStorage.getItem(`skip_${EMP}_${today()}`)||'[]');
+  // 상차한 거래처 + 오늘 요일 거래처
+  const names=[...new Set([
+    ...savedCargos.filter(c=>c.거래처).map(c=>c.거래처),
+    ...stores.filter(s=>s.요일===today_day).map(s=>s.이름)
+  ])].filter(n=>!skipped.includes(n)); // 스킵된 거래처 제외
+  // routeOrder 적용
+  const ordered=[];
+  routeOrder.forEach(n=>{if(names.includes(n))ordered.push(n);});
+  names.forEach(n=>{if(!ordered.includes(n))ordered.push(n);});
+  return ordered;
+}
+
+function renderRoute(){
+  const list=getRouteList();
+  const el=document.getElementById('route-list');
+  const prog=document.getElementById('route-progress');
+  if(!list.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">📍</div><div>루트 없음<br><span style="font-size:10px">출근탭에서 상차를 입력하거나<br>거래처 요일을 등록해주세요</span></div></div>';
+    if(prog)prog.textContent='';return;
+  }
+  const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
+  const doneCount=completedRoutes.filter(n=>list.includes(n)).length;
+  if(prog)prog.textContent=`${doneCount}/${list.length}`;
+  el.innerHTML=list.map((name,i)=>{
+    const done=completedRoutes.includes(name);
+    const s=stores.find(x=>x.이름===name);
+    const cargo=savedCargos.find(c=>c.거래처===name);
+    const meta=cargo?`📦 ${cargo.유종} ${cargo.통수}통 상차`:(s?.유종||'유종미등록');
+    return `<div class="route-item ${done?'done':''}" id="ri-${i}" data-name="${name}">
+      <div class="route-order" style="background:${done?'var(--g)':'var(--p2)'};flex-shrink:0">${done?'✓':i+1}</div>
+      <div class="route-info" onclick="openDelivery('${name}')">
+        <div class="route-name">${name}</div>
+        <div class="route-meta" style="color:${cargo?'var(--o)':'var(--t2)'}">${meta}</div>
+      </div>
+      ${done
+        ?`<button onclick="deleteTxByStore('${name}')" style="padding:6px 10px;background:rgba(255,107,107,.12);border:none;border-radius:8px;color:var(--r);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">납품삭제</button>`
+        :`<button onclick="removeFromRoute('${name}')" style="padding:6px 10px;background:rgba(122,127,148,.12);border:none;border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">✕</button>`
+      }
+      <div class="drag-handle" draggable="true"
+        ondragstart="dragStart(event,'${name}')"
+        ondragover="dragOver(event)"
+        ondrop="dragDrop(event,'${name}')"
+        ondragend="dragEnd(event)">⠿</div>
+    </div>`;
+  }).join('');
+}
+
+// ── 터치 드래그 (모바일 지원) ──
+// 루트에서 거래처 제거 (납품 안하고 차량 재고로 남김)
+function removeFromRoute(name){
+  if(!confirm(`"${name}" 오늘 루트에서 제거할까요?
+(납품 안하고 차량 재고로 남김)`))return;
+  const t=today();
+  // skipRoutes에 추가
+  const skipped=JSON.parse(localStorage.getItem(`skip_${EMP}_${t}`)||'[]');
+  if(!skipped.includes(name))skipped.push(name);
+  localStorage.setItem(`skip_${EMP}_${t}`,JSON.stringify(skipped));
+  renderRoute();
+}
+
+let dragName='';
+function dragStart(e,name){dragName=name;e.dataTransfer.effectAllowed='move';}
+function dragOver(e){e.preventDefault();}
+function dragDrop(e,name){
+  e.preventDefault();
+  if(dragName===name)return;
+  const list=getRouteList();
+  const from=list.indexOf(dragName),to=list.indexOf(name);
+  if(from<0||to<0)return;
+  list.splice(from,1);list.splice(to,0,dragName);
+  routeOrder=[...list];
+  localStorage.setItem(`route_order_${EMP}`,JSON.stringify(routeOrder));
+  renderRoute();
+}
+function dragEnd(e){}
+
+function selectRouteStore(name){ openDelivery(name); }
+function openDelivery(name){
+  if(completedRoutes.includes(name))return; // 완료된건 클릭 무시
+  showDeliveryForm({이름:name});
+}
+
+function showDeliveryForm(store){
+  document.getElementById('route-section').style.display='none';
+  document.getElementById('delivery-form').style.display='block';
+  clearFormOnly();
+  if(store){
+    const s=stores.find(x=>x.이름===store.이름);
+    curStore=s||{이름:store.이름,유종:'',요일:''};
+    document.getElementById('store-search-area').style.display='none';
+    document.getElementById('store-selected-area').style.display='none';
+    document.getElementById('form-title').textContent=store.이름;
+    document.getElementById('form-meta').textContent=`${s?.요일||''}요일 · ${s?.유종||''}`;
+    // 상차 데이터 자동 입력
+    const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
+    const cargo=savedCargos.find(c=>c.거래처===store.이름);
+    if(cargo&&cargo.통수>0){addItem(cargo.유종,cargo.통수);showToast(`📦 ${cargo.유종} ${cargo.통수}통 자동입력`);}
+    else if(s?.유종) addItem(s.유종);
+  } else {
+    curStore=null;
+    document.getElementById('store-search-area').style.display='block';
+    document.getElementById('store-selected-area').style.display='none';
+    document.getElementById('form-title').textContent='신규 / 추가 납품';
+    document.getElementById('form-meta').textContent='거래처를 검색하거나 새로 추가하세요';
+  }
+  updatePayButtons();calcDelivery();
+}
+
+function hideDeliveryForm(){
+  document.getElementById('delivery-form').style.display='none';
+  document.getElementById('route-section').style.display='block';
+  clearFormOnly();
+}
+
+function clearFormOnly(){
+  curPay='';items=[];itemId=0;wasteOn=false;
+  document.getElementById('item-list').innerHTML='';
+  document.getElementById('delivery-result').style.display='none';
+  document.getElementById('pay-buttons').innerHTML='';
+  document.getElementById('pay-amount-wrap').style.display='none';
+  document.getElementById('waste-toggle').classList.remove('on');
+  document.getElementById('waste-fields').style.display='none';
+  document.getElementById('store-q').value='';
+  document.getElementById('search-results').style.display='none';
+  document.getElementById('d-note').value='';
+  document.getElementById('pay-amount').value='';
+  document.getElementById('w-kg').value='';
+  document.getElementById('w-price').value='';
+}
+
+function clearStore(){
+  curStore=null;
+  document.getElementById('store-search-area').style.display='block';
+  document.getElementById('store-selected-area').style.display='none';
+  document.getElementById('form-title').textContent='납품 입력';
+  document.getElementById('form-meta').textContent='';
+  items=[];itemId=0;document.getElementById('item-list').innerHTML='';
+  calcDelivery();
+}
+
+// ── 검색 ──
+function onSearch(){
+  const q=document.getElementById('store-q').value.trim();
+  const res=document.getElementById('search-results');
+  if(!q){res.style.display='none';return;}
+  const filtered=stores.filter(s=>s.이름.includes(q)).slice(0,6);
+  let html=filtered.map(s=>`
+    <div class="search-item" onclick="selectStore('${s.이름}')">
+      <div class="search-name">${s.이름}</div>
+      <div class="search-meta">${s.요일}요일 · ${s.유종||'유종미등록'}</div>
+    </div>`).join('');
+  html+=`<div class="search-new" onclick="openNewStore('${q}')">➕ "${q}" 신규 추가</div>`;
+  res.innerHTML=html;res.style.display='block';
+}
+
+function selectStore(name){
+  const s=stores.find(x=>x.이름===name);if(!s)return;
+  curStore=s;
+  document.getElementById('store-search-area').style.display='none';
+  document.getElementById('store-selected-area').style.display='block';
+  document.getElementById('chip-name').textContent=s.이름;
+  document.getElementById('chip-meta').textContent=`${s.요일}요일 · ${s.유종||''}`;
+  document.getElementById('search-results').style.display='none';
+  document.getElementById('form-title').textContent=s.이름;
+  document.getElementById('form-meta').textContent=`${s.요일}요일 · ${s.유종||''}`;
+  items=[];itemId=0;document.getElementById('item-list').innerHTML='';
+  if(s.유종)addItem(s.유종);
+  updatePayButtons();calcDelivery();
+}
+
+// ── 품목 ──
+function addItem(defaultType='',defaultQty=0){
+  const id=++itemId;
+  const defPrice=defaultType?getPriceAt(defaultType,today())||'':'';
+  items.push({id,type:defaultType,qty:defaultQty,price:+defPrice||0});
+  const el=document.createElement('div');
+  el.className='item-card';el.id=`item-${id}`;
+  const typeOpts=getTypeOptions().map(t=>`<option value="${t}"${t===defaultType?' selected':''}>${t}</option>`).join('');
+  el.innerHTML=`
+    <div class="item-header">
+      <span class="item-badge" id="ib-${id}">${defaultType||'품목 선택'}</span>
+      <button class="btn-danger" onclick="removeItem(${id})">✕</button>
+    </div>
+    <div class="inp-wrap"><label>품목/유종</label>
+      <select class="inp" id="it-${id}" onchange="onItemChange(${id})"><option value="">선택...</option>${typeOpts}</select>
+    </div>
+    <div class="grid2">
+      <div class="inp-wrap" style="margin:0"><label>통수/수량</label><input class="inp" type="number" id="iq-${id}" value="${defaultQty||''}" placeholder="0" inputmode="numeric" oninput="calcItem(${id})"></div>
+      <div class="inp-wrap" style="margin:0"><label>판매단가 (원)</label><input class="inp" type="number" id="ip-${id}" value="${defPrice}" placeholder="0" inputmode="numeric" oninput="calcItem(${id})"></div>
+    </div>
+    <div class="item-calc" id="ic-${id}" style="display:none">마진: <span id="im-${id}">-</span></div>`;
+  document.getElementById('item-list').appendChild(el);
+  if(defaultType&&defaultQty)calcItem(id);
+}
+function removeItem(id){items=items.filter(i=>i.id!==id);document.getElementById(`item-${id}`)?.remove();calcDelivery();}
+function onItemChange(id){
+  const type=document.getElementById(`it-${id}`).value;
+  document.getElementById(`ib-${id}`).textContent=type||'품목 선택';
+  const p=getPriceAt(type,today());
+  if(p)document.getElementById(`ip-${id}`).value=p;
+  const item=items.find(i=>i.id===id);if(item)item.type=type;
+  calcItem(id);
+}
+function calcItem(id){
+  const type=document.getElementById(`it-${id}`)?.value||'';
+  const qty=parseFloat(document.getElementById(`iq-${id}`)?.value)||0;
+  const price=parseFloat(document.getElementById(`ip-${id}`)?.value)||0;
+  const cost=getPriceAt(type,today())||0;
+  const item=items.find(i=>i.id===id);
+  if(item){item.type=type;item.qty=qty;item.price=price;}
+  const calcEl=document.getElementById(`ic-${id}`);
+  if(qty>0&&price>0&&cost>0){
+    calcEl.style.display='block';
+    document.getElementById(`im-${id}`).textContent=`${(price-cost).toLocaleString()}원/통 × ${qty}통 = ${(qty*(price-cost)).toLocaleString()}원`;
+  } else calcEl.style.display='none';
+  calcDelivery();
+}
+
+function toggleWaste(){
+  wasteOn=!wasteOn;
+  document.getElementById('waste-toggle').classList.toggle('on',wasteOn);
+  document.getElementById('waste-fields').style.display=wasteOn?'block':'none';
+  updatePayButtons();calcDelivery();
+}
+
+function updatePayButtons(){
+  const hasOil=items.some(i=>i.qty>0);
+  const isWasteOnly=!hasOil&&wasteOn;
+  const container=document.getElementById('pay-buttons');
+  if(isWasteOnly){
+    container.innerHTML=`<div class="pay-row"><div class="pay-btn danger" onclick="selPay(this,'현금지급')">현금지급</div><div class="pay-btn danger" onclick="selPay(this,'이체지급')">이체지급</div></div>`;
+  } else {
+    container.innerHTML=`<div class="pay-row"><div class="pay-btn" onclick="selPay(this,'현금')">현금</div><div class="pay-btn danger" onclick="selPay(this,'미수')">미수</div></div>
+    <div class="pay-row"><div class="pay-btn danger" onclick="selPay(this,'반품')" style="grid-column:span 2">↩️ 반품 (미수차감)</div></div>`;
+  }
+  curPay='';document.getElementById('pay-amount-wrap').style.display='none';
+}
+
+function selPay(el,p){
+  curPay=p;
+  document.querySelectorAll('.pay-btn').forEach(b=>b.classList.remove('on'));
+  el.classList.add('on');
+  const show=p!=='미수'&&p!=='반품';
+  document.getElementById('pay-amount-wrap').style.display=show?'block':'none';
+  document.getElementById('pay-amount-label').textContent=p.includes('지급')?'지급액 (원)':'수금액 (원)';
+}
+
+function calcDelivery(){
+  const oilTotal=items.reduce((s,i)=>s+i.qty*i.price,0);
+  const oilMargin=items.reduce((s,i)=>s+i.qty*(i.price-(getPriceAt(i.type,today())||0)),0);
+  const wasteKg=wasteOn?(parseFloat(document.getElementById('w-kg')?.value)||0):0;
+  const wastePriceVal=wasteOn?(parseFloat(document.getElementById('w-price')?.value)||0):0;
+  const wastePay=Math.round(wasteKg*wastePriceVal);
+  const wcp=getWastePriceAt(today());
+  const wasteRev=Math.round(wasteKg*Math.max(0,wcp-wastePriceVal));
+  const charge=oilTotal-wastePay;
+  const box=document.getElementById('delivery-result');
+  if(oilTotal>0||wasteKg>0){
+    box.style.display='block';
+    document.getElementById('dr-oil').textContent=oilTotal.toLocaleString()+'원';
+    const fi=items.find(i=>i.qty>0);
+    document.getElementById('dr-margin').textContent=fi?`${(fi.price-(getPriceAt(fi.type,today())||0)).toLocaleString()}원/통`:'-';
+    document.getElementById('dr-waste-pay').textContent=wastePay>0?wastePay.toLocaleString()+'원':'-';
+    const chargeEl=document.getElementById('dr-charge');
+    chargeEl.textContent=charge.toLocaleString()+'원';
+    chargeEl.style.color=charge<0?'var(--r)':'var(--y)';
+    document.getElementById('dr-waste-rev').textContent=wasteRev>0?wasteRev.toLocaleString()+'원':'-';
+    document.getElementById('dr-total').textContent=(oilMargin+wasteRev).toLocaleString()+'원';
+  } else box.style.display='none';
+  updatePayButtons();
+}
+
+async function saveDelivery(){
+  if(!curStore&&!document.getElementById('chip-name').textContent){showToast('거래처를 선택해주세요');return;}
+  if(items.length===0&&!wasteOn){showToast('품목 또는 폐유를 입력해주세요');return;}
+  if(!curPay){showToast('수금방법을 선택해주세요');return;}
+  const t=today();
+  const storeName=curStore?.이름||document.getElementById('chip-name').textContent||'임시거래처';
+  const oilTotal=items.reduce((s,i)=>s+i.qty*i.price,0);
+  const oilMargin=items.reduce((s,i)=>s+i.qty*(i.price-(getPriceAt(i.type,t)||0)),0);
+  const wasteKg=wasteOn?(parseFloat(document.getElementById('w-kg')?.value)||0):0;
+  const wastePriceVal=wasteOn?(parseFloat(document.getElementById('w-price')?.value)||0):0;
+  const wastePay=Math.round(wasteKg*wastePriceVal);
+  const wcp=getWastePriceAt(t);
+  const wasteRev=Math.round(wasteKg*Math.max(0,wcp-wastePriceVal));
+  const charge=oilTotal-wastePay;
+  const payAmt=parseFloat(document.getElementById('pay-amount')?.value)||0;
+  const tx={
+    id:Date.now(),날짜:t,직원:EMP,거래처:storeName,
+    유종:items.map(i=>i.type).filter(Boolean).join('/'),
+    품목상세:JSON.stringify(items.map(i=>({type:i.type,qty:i.qty,price:i.price}))),
+    통수:items.reduce((s,i)=>s+i.qty,0),
+    판매단가:items.length===1?items[0].price:0,
+    출고가:items.length===1?(getPriceAt(items[0].type,t)||0):0,
+    폐유kg:wasteKg,폐유매입단가:wastePriceVal,
+    식유금액:oilTotal,폐유매입금:wastePay,차감청구:charge,
+    식유마진:oilMargin,폐유수익:wasteRev,총수익:oilMargin+wasteRev,
+    수금방법:curPay,수금액:payAmt,
+    미수:curPay==='미수'||curPay==='반품',
+    비고:document.getElementById('d-note')?.value||''
+  };
+  try{
+    await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'tx',tx})});
+    txList.unshift(tx);
+    localStorage.setItem(`tx_${EMP}_v3`,JSON.stringify(txList.slice(0,300)));
+    completedRoutes.push(storeName);
+    localStorage.setItem(`done_${EMP}_${t}`,JSON.stringify(completedRoutes));
+    showToast('✅ 저장됐어요!');
+    hideDeliveryForm();
+    renderRoute();
+    renderHistory();
+  }catch(e){showToast('⚠️ 저장 실패');}
+}
+
+// ── 삭제 ──
+async function deleteTxByStore(storeName){
+  if(!confirm(`${storeName} 납품을 삭제할까요?`))return;
+  const t=today();
+  const tx=txList.find(x=>x.거래처===storeName&&x.날짜===t);
+  if(!tx){showToast('삭제할 납품을 찾을 수 없어요');return;}
+  const now=new Date();
+  try{
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'delete_tx',id:tx.id,year:now.getFullYear(),month:now.getMonth()+1})});
+    const d=await res.json();
+    if(d.ok===false){showToast('⚠️ '+d.error);return;}
+  }catch(e){/* no-cors 환경 */}
+  txList=txList.filter(x=>x.id!==tx.id);
+  localStorage.setItem(`tx_${EMP}_v3`,JSON.stringify(txList));
+  completedRoutes=completedRoutes.filter(n=>n!==storeName);
+  localStorage.setItem(`done_${EMP}_${t}`,JSON.stringify(completedRoutes));
+  showToast('✅ 삭제됐어요');
+  renderRoute();renderHistory();
+}
+
+async function deleteTx(id,storeName=''){
+  if(!confirm(`${storeName||'이 납품'}을 삭제할까요?`))return;
+  const now=new Date();
+  try{
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'delete_tx',id,year:now.getFullYear(),month:now.getMonth()+1})});
+    const d=await res.json();
+    if(d.ok===false){showToast('⚠️ '+d.error);return;}
+  }catch(e){}
+  txList=txList.filter(t=>t.id!==id);
+  localStorage.setItem(`tx_${EMP}_v3`,JSON.stringify(txList));
+  if(storeName){
+    const t=today();
+    completedRoutes=completedRoutes.filter(n=>n!==storeName);
+    localStorage.setItem(`done_${EMP}_${t}`,JSON.stringify(completedRoutes));
+  }
+  showToast('✅ 삭제됐어요');
+  renderRoute();renderHistory();
+}
+
+// ══════════════ 입금 ══════════════
+async function savePayment(){
+  const store=document.getElementById('pay-store').value;
+  const amt=parseFloat(document.getElementById('pay-amt').value)||0;
+  if(!store||!amt){showToast('거래처와 금액을 입력해주세요');return;}
+  const payment={id:Date.now(),날짜:today(),직원:EMP,거래처:store,
+    입금자명:document.getElementById('pay-payer').value,
+    금액:amt,방법:document.getElementById('pay-method').value,
+    비고:document.getElementById('pay-note').value};
+  await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'payment',payment})});
+  todayPayments.unshift(payment);
+  localStorage.setItem(`pay_${EMP}_today`,JSON.stringify(todayPayments.slice(0,20)));
+  showToast('✅ 입금 저장됐어요!');
+  ['pay-store','pay-amt','pay-payer','pay-note'].forEach(id=>document.getElementById(id).value='');
+  renderTodayPayments();
+}
+function calcSettlement(){
+  const t=today();
+  const myTx=txList.filter(x=>x.날짜===t&&x.직원===EMP);
+  const 현금수령=myTx.filter(x=>x.수금방법==='현금').reduce((s,x)=>s+x.수금액,0);
+  const 폐유지급=myTx.filter(x=>x.수금방법==='현금지급').reduce((s,x)=>s+x.수금액,0);
+  const 전달=현금수령-폐유지급;
+  document.getElementById('settle-cash').textContent=현금수령.toLocaleString()+'원';
+  document.getElementById('settle-waste').textContent=폐유지급.toLocaleString()+'원';
+  document.getElementById('settle-total').textContent=전달.toLocaleString()+'원';
+}
+
+function renderTodayPayments(){
+  const el=document.getElementById('today-payment-list');
+  const t=today();
+  const list=todayPayments.filter(p=>p.날짜===t);
+  if(!list.length){el.innerHTML='<div style="font-size:12px;color:var(--t3);padding:8px 0">오늘 입금 없음</div>';return;}
+  el.innerHTML=list.map(p=>`
+    <div class="tx-card">
+      <div class="tx-top"><div><div class="tx-store">${p.거래처}</div></div>
+        <div style="text-align:right"><div class="tx-date">${p.날짜}</div><span class="badge g">${p.방법}</span></div>
+      </div>
+      <div class="tx-bottom">
+        <span style="font-size:12px;color:var(--t2)">${p.입금자명||''}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--g)">${p.금액.toLocaleString()}원</span>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════ 내역 ══════════════
+function renderHistory(){
+  const now=new Date();
+  const month=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const list=txList.filter(t=>t.날짜.startsWith(month));
+  const el=document.getElementById('history-list');
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">📝</div><div>내역 없음</div></div>';return;}
+  const t=today();
+  el.innerHTML=list.map(tx=>`
+    <div class="tx-card">
+      <div class="tx-top">
+        <div><div class="tx-store">${tx.거래처}</div><span class="badge ${tx.미수?'r':'g'}">${tx.수금방법}</span></div>
+        <div style="text-align:right">
+          <div class="tx-date">${tx.날짜}</div>
+          ${tx.날짜===t?`<button class="btn-danger" style="font-size:10px;padding:4px 8px;margin-top:4px" onclick="deleteTx(${tx.id},'${tx.거래처}')">삭제</button>`:''}
+        </div>
+      </div>
+      <div class="tx-grid">
+        ${tx.통수>0?`<div class="tx-detail">납품 <span>${tx.통수}통</span></div>`:''}
+        ${tx.식유금액>0?`<div class="tx-detail">식유금액 <span>${tx.식유금액.toLocaleString()}원</span></div>`:''}
+        ${tx.폐유kg>0?`<div class="tx-detail">폐유 <span>${tx.폐유kg}kg</span></div>`:''}
+        ${tx.식유마진?`<div class="tx-detail">마진 <span>${tx.식유마진.toLocaleString()}원</span></div>`:''}
+        ${tx.비고?`<div class="tx-detail" style="grid-column:span 2">📌 <span>${tx.비고}</span></div>`:''}
+      </div>
+      <div class="tx-bottom">
+        <span style="font-size:12px;color:var(--t2)">청구 ${(tx.차감청구||0).toLocaleString()}원</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--g)">${(tx.총수익||0).toLocaleString()}원</span>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════ 신규 거래처 ══════════════
+function openNewStore(name){
+  document.getElementById('ns-name').value=name;
+  ['ns-day','ns-type','ns-payer','ns-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('ns-sub').textContent=`"${name}"을(를) 새 거래처로 추가합니다`;
+  document.getElementById('new-store-modal').classList.add('show');
+}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+async function saveNewStore(){
+  const 이름=document.getElementById('ns-name').value.trim();
+  const 요일=document.getElementById('ns-day').value;
+  if(!이름||!요일){showToast('필수 항목을 입력해주세요');return;}
+  const s={코드:'C'+Date.now(),이름,담당:EMP,요일,
+    유종:document.getElementById('ns-type').value,
+    입금자:document.getElementById('ns-payer').value.trim(),
+    비고:document.getElementById('ns-note').value.trim()};
+  stores.push(s);
+  localStorage.setItem('stores_v3',JSON.stringify(stores));
+  await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'stores',stores})});
+  closeModal('new-store-modal');
+  buildPayStore();
+  selectStore(s.이름);
+  showToast('✅ 거래처 추가됐어요!');
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+init();
+</script>
+</body>
+</html>

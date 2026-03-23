@@ -1,0 +1,907 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>사장님 - 식용유 유통</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@400;700&display=swap');
+:root{
+  --bg:#0d1117;--card:#161b22;--card2:#1c2129;--border:#30363d;
+  --y:#f0a500;--y2:#e09000;--g:#3fb950;--b:#58a6ff;--r:#f85149;
+  --t:#e6edf3;--t2:#8b949e;--t3:#484f58;--R:14px;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--t);min-height:100vh;max-width:440px;margin:0 auto;}
+.tabs{position:sticky;top:0;z-index:100;background:var(--bg);border-bottom:1px solid var(--border);display:flex;}
+.tab{flex:1;padding:13px 2px;text-align:center;font-size:10px;font-weight:600;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;}
+.tab.on{color:var(--y);border-bottom-color:var(--y);}
+.page{display:none;padding:16px 16px 80px;}
+.page.on{display:block;}
+.sec-label{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--t3);text-transform:uppercase;margin-bottom:10px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--R);padding:14px;margin-bottom:10px;}
+.divider{height:1px;background:var(--border);margin:14px 0;}
+.inp-wrap{display:flex;flex-direction:column;gap:4px;margin-bottom:10px;}
+.inp-wrap label{font-size:11px;color:var(--t2);font-weight:500;}
+.inp{width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:12px 13px;color:var(--t);font-size:14px;font-family:'Noto Sans KR',sans-serif;outline:none;transition:border-color .2s;appearance:none;-webkit-appearance:none;}
+.inp:focus{border-color:var(--y);}
+.inp::placeholder{color:var(--t3);}
+.inp[type=number]{font-family:'JetBrains Mono',monospace;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.btn-primary{width:100%;padding:14px;background:var(--y2);color:#000;border:none;border-radius:12px;font-size:15px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer;margin-top:4px;}
+.btn-refresh{padding:10px 14px;background:var(--card);border:1px solid var(--border);border-radius:10px;color:var(--t2);font-size:12px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
+.btn-danger{padding:7px 10px;background:rgba(248,81,73,.1);border:none;border-radius:7px;color:var(--r);font-size:11px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;}
+.kpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:var(--R);padding:13px;}
+.kpi-label{font-size:9px;color:var(--t3);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px;}
+.kpi-val{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;}
+.kpi-val.y{color:var(--y);}.kpi-val.g{color:var(--g);}.kpi-val.r{color:var(--r);}.kpi-val.b{color:var(--b);}
+.info-box{background:var(--card);border:1px solid var(--border);border-radius:var(--R);padding:13px;margin-bottom:10px;}
+.info-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);}
+.info-row:last-child{border-bottom:none;}
+.il{font-size:12px;color:var(--t2);}
+.iv{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;}
+.iv.y{color:var(--y);}.iv.g{color:var(--g);}.iv.r{color:var(--r);}
+
+/* 일자별 써머리 */
+.day-summary{background:var(--card);border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden;}
+.day-header{display:flex;justify-content:space-between;align-items:center;padding:11px 13px;cursor:pointer;background:var(--card2);}
+.day-date{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;}
+.day-day{font-size:11px;color:var(--t2);margin-left:6px;}
+.day-total{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--g);}
+.day-body{padding:10px 13px;display:none;}
+.day-body.show{display:block;}
+.day-emp-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);}
+.day-emp-row:last-child{border-bottom:none;}
+.day-emp-name{font-size:12px;font-weight:600;color:var(--y);}
+.day-emp-stats{font-size:11px;color:var(--t2);}
+.day-emp-rev{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--g);}
+
+.tx-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:8px;}
+.tx-top{display:flex;justify-content:space-between;margin-bottom:6px;}
+.tx-store{font-size:14px;font-weight:700;}
+.tx-date{font-size:10px;color:var(--t3);font-family:'JetBrains Mono',monospace;}
+.tx-emp{display:inline-block;font-size:10px;padding:2px 7px;border-radius:20px;background:rgba(240,165,0,.1);color:var(--y);font-weight:600;margin-bottom:5px;}
+.tx-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;}
+.tx-detail{font-size:11px;color:var(--t2);}
+.tx-detail span{color:var(--t);font-weight:500;}
+.tx-bottom{display:flex;justify-content:space-between;padding-top:8px;border-top:1px solid var(--border);margin-top:6px;align-items:center;}
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:10px;font-weight:600;}
+.badge.r{background:rgba(248,81,73,.1);color:var(--r);}
+.badge.g{background:rgba(63,185,80,.1);color:var(--g);}
+.misu-item{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:12px 13px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;}
+.misu-name{font-size:13px;font-weight:700;}
+.misu-amt{font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--r);}
+.price-item{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:12px 13px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center;}
+.price-name{font-size:13px;font-weight:600;}
+.price-meta{font-size:10px;color:var(--t3);margin-top:2px;}
+.price-val{font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--y);}
+.price-tag{display:inline-block;padding:2px 6px;border-radius:5px;font-size:9px;font-weight:700;margin-left:4px;}
+.price-tag.수수료{background:rgba(248,81,73,.1);color:var(--r);}
+.price-tag.범용{background:rgba(88,166,255,.1);color:var(--b);}
+.price-tag.전용{background:rgba(63,185,80,.1);color:var(--g);}
+.price-tag.식자재{background:rgba(240,165,0,.1);color:var(--y);}
+.month-row{display:flex;gap:8px;align-items:flex-end;margin-bottom:14px;}
+.month-row input,.month-row select{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;}
+.page-title{font-size:18px;font-weight:900;padding:12px 0 4px;}
+.hint{font-size:11px;color:var(--t3);margin-bottom:10px;padding:6px 10px;background:rgba(240,165,0,.05);border-radius:8px;border-left:3px solid var(--y);}
+.empty{text-align:center;padding:40px 20px;color:var(--t3);}
+.empty-icon{font-size:36px;margin-bottom:10px;}
+.toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--g);color:#000;padding:11px 22px;border-radius:100px;font-size:13px;font-weight:700;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+select option{background:#161b22;}
+</style>
+</head>
+<body>
+<div class="tabs">
+  <div class="tab on"  onclick="goTab('dashboard')">📊 현황</div>
+  <div class="tab"     onclick="goTab('history')">📋 내역</div>
+  <div class="tab"     onclick="goTab('prices')">💰 단가</div>
+</div>
+
+<!-- 현황 -->
+<div class="page on" id="page-dashboard">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 4px">
+    <div class="page-title">📊 사장님 현황</div>
+    <div style="font-size:10px;color:var(--t3);text-align:right" id="last-update">-</div>
+  </div>
+  <div class="month-row">
+    <input type="month" id="dash-month" onchange="loadDashboard()">
+    <button class="btn-refresh" onclick="loadAll()">📡 새로고침</button>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi"><div class="kpi-label">손호영 마진</div><div class="kpi-val y" id="k-son-m">-</div></div>
+    <div class="kpi"><div class="kpi-label">박귀빈 마진</div><div class="kpi-val y" id="k-bak-m">-</div></div>
+    <div class="kpi"><div class="kpi-label">손호영 폐유수입</div><div class="kpi-val b" id="k-son-w">-</div></div>
+    <div class="kpi"><div class="kpi-label">박귀빈 폐유수입</div><div class="kpi-val b" id="k-bak-w">-</div></div>
+    <div class="kpi"><div class="kpi-label">이달 총수익</div><div class="kpi-val g" id="k-total">-</div></div>
+    <div class="kpi"><div class="kpi-label">미수잔액</div><div class="kpi-val r" id="k-misu">-</div></div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="sec-label">시재 현황</div>
+  <div class="info-box">
+    <div class="info-row"><span class="il">손호영 전달현금</span><span class="iv y" id="sj-son">-</span></div>
+    <div class="info-row"><span class="il">박귀빈 전달현금</span><span class="iv y" id="sj-bak">-</span></div>
+    <div class="info-row"><span class="il">합계</span><span class="iv" id="sj-tot">-</span></div>
+  </div>
+
+  <div class="divider"></div>
+  <div class="sec-label">직원 정산 현황</div>
+  <div id="settlement-list" style="margin-bottom:4px"></div>
+
+  <div class="divider"></div>
+  <div class="sec-label">미수금 거래처 <span style="color:var(--t3);font-weight:400">탭하면 상세</span></div>
+  <div id="misu-list" style="margin-bottom:16px"></div>
+
+  <div class="divider"></div>
+  <div class="sec-label">일자별 써머리 <span style="color:var(--t3);font-weight:400">(탭 눌러서 펼치기)</span></div>
+  <div id="day-summary-list"></div>
+</div>
+
+<!-- 미수금 상세 모달 -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;flex-direction:column" id="misu-detail-modal">
+  <div style="background:var(--card);border-radius:0 0 20px 20px;padding:16px 18px;display:flex;justify-content:space-between;align-items:center">
+    <div>
+      <div style="font-size:18px;font-weight:900" id="md-store-name">-</div>
+      <div style="font-size:11px;color:var(--t3);margin-top:2px">미수금 상세 내역</div>
+    </div>
+    <button onclick="closeMisuDetail()" style="padding:8px 14px;background:var(--card2);border:1px solid var(--border);border-radius:10px;color:var(--t2);font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif">✕ 닫기</button>
+  </div>
+  <div style="flex:1;overflow-y:auto;padding:16px 18px 40px">
+    <!-- 잔액 박스 -->
+    <div style="background:rgba(255,107,107,.08);border:1.5px solid rgba(255,107,107,.2);border-radius:14px;padding:16px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:10px;color:var(--t3);font-weight:700;letter-spacing:.1em">현재 미수잔액</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:900;color:var(--r);margin-top:4px" id="md-balance">-</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:10px;color:var(--t3)">총 납품</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--t2)" id="md-total-tx">-</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:4px">총 입금</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--g)" id="md-total-pay">-</div>
+      </div>
+    </div>
+    <!-- 타임라인 -->
+    <div class="sec-label">거래 타임라인</div>
+    <div id="md-timeline"></div>
+  </div>
+</div>
+
+<!-- 내역 -->
+<div class="page" id="page-history">
+  <div class="page-title">📋 전체 내역</div>
+  <div class="month-row" style="margin-bottom:10px">
+    <input type="month" id="hist-month" onchange="loadHistoryAll()" style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;">
+    <select id="hist-emp" onchange="loadHistoryAll()" style="flex:0.7;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;">
+      <option value="">전체</option><option>손호영</option><option>박귀빈</option>
+    </select>
+  </div>
+  <!-- 서브탭 -->
+  <div style="display:flex;gap:6px;margin-bottom:14px">
+    <div class="sub-tab on" id="st-tx"     onclick="switchSubTab('tx')"     style="flex:1;padding:10px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:rgba(240,165,0,.1);color:var(--y);border:1.5px solid var(--y)">📦 납품</div>
+    <div class="sub-tab"    id="st-waste"  onclick="switchSubTab('waste')"  style="flex:1;padding:10px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:var(--card);color:var(--t3);border:1.5px solid var(--border)">♻️ 폐유</div>
+    <div class="sub-tab"    id="st-payment" onclick="switchSubTab('payment')" style="flex:1;padding:10px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:var(--card);color:var(--t3);border:1.5px solid var(--border)">💳 입금</div>
+  </div>
+  <div id="history-list"></div>
+</div>
+
+<!-- 단가 -->
+<div class="page" id="page-prices">
+  <div class="page-title">💰 단가 관리</div>
+  <div class="hint">단가는 추가만 가능 (수정/삭제 불가) → 과거 거래 마진 보호</div>
+
+  <div class="sec-label">폐유 회사매입단가</div>
+  <!-- 현재 단가 -->
+  <div class="info-box" style="margin-bottom:8px" id="waste-cur-box">
+    <div class="info-row">
+      <div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">현재 단가</div>
+        <div class="iv y" id="waste-cur" style="font-size:20px">-</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px" id="waste-cur-date">-</div>
+      </div>
+      <button onclick="openEditWaste(0)" style="padding:7px 12px;background:rgba(88,166,255,.1);border:none;border-radius:8px;color:var(--b);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif">수정</button>
+    </div>
+    <!-- 이전 단가 -->
+    <div class="info-row" id="waste-prev-row" style="display:none">
+      <div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">이전 단가</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--t2)" id="waste-prev">-</div>
+        <div style="font-size:10px;color:var(--t3);margin-top:2px" id="waste-prev-date">-</div>
+      </div>
+      <button onclick="openEditWaste(1)" style="padding:7px 12px;background:rgba(88,166,255,.05);border:none;border-radius:8px;color:var(--t3);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif">수정</button>
+    </div>
+  </div>
+  <!-- 새 단가 추가 -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="grid2">
+      <div class="inp-wrap"><label>새 단가 (원/kg)</label><input class="inp" type="number" id="nw-price" placeholder="1540" inputmode="numeric"></div>
+      <div class="inp-wrap"><label>적용일</label><input class="inp" type="date" id="nw-date" id="nw-date"></div>
+    </div>
+    <button class="btn-primary" onclick="addWastePrice()" style="background:var(--r);color:#fff">폐유 단가 변경 (새로 추가)</button>
+  </div>
+
+  <div class="sec-label">식용유 / 식자재 단가 추가</div>
+  <div class="card" style="margin-bottom:16px">
+    <div class="grid2">
+      <div class="inp-wrap">
+        <label>품명 *</label>
+        <select class="inp" id="np-name" onchange="toggleCustom()">
+          <option value="">선택...</option>
+          <option>하이골드</option><option>그린마켓</option><option>해표</option>
+          <option>노블대두</option><option>영미카놀라</option><option>영미대두</option>
+          <option>교촌전용</option><option>자담치킨</option><option>삼동소바</option>
+          <option>호치킨</option><option>인정후라이드</option>
+          <option>고추기름</option><option>호일</option><option>밀가루</option>
+          <option value="_custom">직접 입력...</option>
+        </select>
+      </div>
+      <div class="inp-wrap">
+        <label>구분</label>
+        <select class="inp" id="np-cat">
+          <option>범용</option><option>전용</option><option>수수료</option><option>식자재</option>
+        </select>
+      </div>
+    </div>
+    <div class="inp-wrap" id="custom-wrap" style="display:none">
+      <label>품명 직접 입력</label><input class="inp" type="text" id="np-custom" placeholder="품명">
+    </div>
+    <div class="grid2">
+      <div class="inp-wrap"><label>출고가 (원/통)</label><input class="inp" type="number" id="np-val" placeholder="41500" inputmode="numeric"></div>
+      <div class="inp-wrap"><label>적용일</label><input class="inp" type="date" id="np-date"></div>
+    </div>
+    <button class="btn-primary" onclick="addPrice()">단가 추가</button>
+  </div>
+
+  <div class="sec-label">현재 단가표</div>
+  <div id="price-list"></div>
+</div>
+
+<!-- 폐유단가 수정 모달 -->
+<div style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:200;align-items:flex-end;justify-content:center" id="edit-waste-modal" onclick="if(event.target===this)closeEditWaste()">
+  <div style="background:var(--card);border-radius:20px 20px 0 0;padding:22px 18px 40px;width:100%;max-width:440px">
+    <div style="font-size:17px;font-weight:900;margin-bottom:4px">폐유 단가 수정</div>
+    <div style="font-size:12px;color:var(--t2);margin-bottom:16px" id="edit-waste-info"></div>
+    <div style="font-size:11px;color:var(--y);background:rgba(240,165,0,.08);border-radius:8px;padding:8px 10px;margin-bottom:14px">
+      ⚠️ 단가(금액)만 수정 가능. 날짜는 수정 불가.<br>날짜가 잘못됐으면 삭제 후 재등록하세요.
+    </div>
+    <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px">
+      <label style="font-size:11px;color:var(--t2);font-weight:500">단가 (원/kg) *</label>
+      <input class="inp" type="number" id="edit-waste-price" inputmode="numeric">
+    </div>
+    <div style="font-size:11px;color:var(--t3);margin-bottom:16px" id="edit-waste-date-label"></div>
+    <div style="display:flex;gap:8px">
+      <button onclick="deleteWastePrice()" style="flex:1;padding:13px;background:rgba(248,81,73,.1);border:none;border-radius:11px;color:var(--r);font-size:14px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif">삭제</button>
+      <button onclick="closeEditWaste()" style="flex:1;padding:13px;background:var(--card2);border:1.5px solid var(--border);border-radius:11px;color:var(--t2);font-size:14px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif">취소</button>
+      <button onclick="saveEditWaste()" style="flex:2;padding:13px;background:var(--y2);border:none;border-radius:11px;color:#000;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">수정 저장</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = 'https://script.google.com/macros/s/AKfycbxx1H1Ich2nsHf3iNEpC3NajRuCYkcrBf7C5ok_jVrtzAmO4ZrbnJNjLw-J8B99SCId/exec';
+const DAYS=['일','월','화','수','목','금','토'];
+
+let allTx=[], allPayments=[], allWaste=[], allPrices=[];
+
+async function init(){
+  const now=new Date();
+  const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  document.getElementById('dash-month').value=ym;
+  const todayStr=now.toISOString().slice(0,10);
+  document.getElementById('nw-date').value=todayStr;
+  document.getElementById('nw-date').min=todayStr;
+  document.getElementById('np-date').value=todayStr;
+  document.getElementById('np-date').min=todayStr;
+  // 내역탭 월 기본값도 이번달로
+  document.getElementById('hist-month').value=ym;
+  await loadAll();
+}
+
+async function loadAll(){
+  showToast('📡 불러오는 중...');
+  try{
+    await Promise.all([loadMonths(),loadPrices()]);
+    await loadDashboard();
+    showToast('✅ 완료!');
+  }catch(e){showToast('⚠️ 연결 실패');}
+}
+
+async function loadMonths(){
+  const res=await fetch(API+'?type=months');
+  const d=await res.json();
+  const sel=document.getElementById('hist-month');
+  sel.innerHTML=(d.months||[]).map(m=>`<option value="${m}">${m}</option>`).join('');
+}
+
+async function loadDashboard(){
+  const month=document.getElementById('dash-month').value;
+  if(!month)return;
+  const [y,m]=month.split('-');
+  const [tr,pr,wr]=await Promise.all([
+    fetch(`${API}?type=tx&year=${y}&month=${m}`).then(r=>r.json()),
+    fetch(`${API}?type=payments&year=${y}&month=${m}`).then(r=>r.json()),
+    fetch(`${API}?type=waste_deliveries&year=${y}&month=${m}`).then(r=>r.json()),
+  ]);
+  allTx=(tr.rows||[]).map(parseTx);
+  allPayments=pr.rows||[];
+  allWaste=wr.rows||[];
+  renderDashboard();
+}
+
+let curSubTab='tx';
+let histPayments=[], histWaste=[];
+
+async function loadHistoryAll(){
+  let month=document.getElementById('hist-month').value;
+  if(!month) month=document.getElementById('dash-month').value;
+  if(!month) return;
+  document.getElementById('hist-month').value=month;
+  const [y,m]=month.split('-');
+  try{
+    const [tr,pr,wr]=await Promise.all([
+      fetch(`${API}?type=tx&year=${y}&month=${m}`).then(r=>r.json()),
+      fetch(`${API}?type=payments&year=${y}&month=${m}`).then(r=>r.json()),
+      fetch(`${API}?type=waste_deliveries&year=${y}&month=${m}`).then(r=>r.json()),
+    ]);
+    allTx=(tr.rows||[]).map(parseTx);
+    histPayments=pr.rows||[];
+    histWaste=wr.rows||[];
+    renderHistoryByTab();
+  }catch(e){showToast('⚠️ 불러오기 실패');}
+}
+
+// 하위 호환
+async function loadHistory(){ await loadHistoryAll(); }
+
+function switchSubTab(tab){
+  curSubTab=tab;
+  document.querySelectorAll('.sub-tab').forEach(el=>{
+    el.style.background='var(--card)';
+    el.style.color='var(--t3)';
+    el.style.borderColor='var(--border)';
+  });
+  const on=document.getElementById(`st-${tab}`);
+  on.style.background='rgba(240,165,0,.1)';
+  on.style.color='var(--y)';
+  on.style.borderColor='var(--y)';
+  renderHistoryByTab();
+}
+
+function renderHistoryByTab(){
+  if(curSubTab==='tx') renderHistory();
+  else if(curSubTab==='waste') renderWasteHistory();
+  else if(curSubTab==='payment') renderPaymentHistory();
+}
+
+async function loadPrices(){
+  const res=await fetch(API+'?type=prices');
+  const d=await res.json();
+  allPrices=d.prices||[];
+  renderPrices();
+}
+
+function parseTx(r){
+  return{
+    id:r.ID,날짜:String(r.날짜||'').slice(0,10),직원:r.직원,거래처:r.거래처,유종:r.유종,
+    통수:+r.통수||0,식유금액:+r.식유금액||0,
+    폐유kg:+r.폐유kg||0,폐유매입금:+r.폐유매입금||0,
+    차감청구:+r.차감청구||0,식유마진:+r.식유마진||0,
+    폐유수익:+r.폐유수익||0,총수익:+r.총수익||0,
+    수금방법:r.수금방법,수금액:+r.수금액||0,
+    미수:r.미수===true||r.미수==='TRUE'||r.미수==='true',
+    비고:r.비고||''
+  };
+}
+
+function renderDashboard(){
+  const son=allTx.filter(t=>t.직원==='손호영');
+  const bak=allTx.filter(t=>t.직원==='박귀빈');
+  const sum=(a,k)=>a.reduce((s,t)=>s+(t[k]||0),0);
+  const fmt=n=>n.toLocaleString()+'원';
+
+  const sonWI=allWaste.filter(w=>w.직원==='손호영').reduce((s,w)=>s+(+w.폐유수입||0),0);
+  const bakWI=allWaste.filter(w=>w.직원==='박귀빈').reduce((s,w)=>s+(+w.폐유수입||0),0);
+
+  document.getElementById('k-son-m').textContent=fmt(sum(son,'식유마진'));
+  document.getElementById('k-bak-m').textContent=fmt(sum(bak,'식유마진'));
+  document.getElementById('k-son-w').textContent=fmt(sonWI);
+  document.getElementById('k-bak-w').textContent=fmt(bakWI);
+  document.getElementById('k-total').textContent=fmt(sum(allTx,'총수익')+sonWI+bakWI);
+
+  const mm={};
+  allTx.forEach(t=>{if(t.미수)mm[t.거래처]=(mm[t.거래처]||0)+t.차감청구;});
+  allPayments.forEach(p=>{if(mm[p.거래처])mm[p.거래처]=Math.max(0,mm[p.거래처]-(+p.금액||0));});
+  document.getElementById('k-misu').textContent=fmt(Object.values(mm).reduce((a,b)=>a+b,0));
+
+  const sc=(a,m)=>a.filter(t=>t.수금방법===m).reduce((s,t)=>s+t.수금액,0);
+  const sd=sc(son,'현금')-sc(son,'현금지급');
+  const bd=sc(bak,'현금')-sc(bak,'현금지급');
+  document.getElementById('sj-son').textContent=fmt(sd);
+  document.getElementById('sj-bak').textContent=fmt(bd);
+  document.getElementById('sj-tot').textContent=fmt(sd+bd);
+
+  // 정산 현황
+  const settlEl=document.getElementById('settlement-list');
+  const empList=[
+    {name:'손호영', 전달:sd},
+    {name:'박귀빈', 전달:bd}
+  ];
+  settlEl.innerHTML=empList.map(e=>`
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:14px;font-weight:700">${e.name}</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:2px">오늘 전달해야 할 현금</div>
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;color:${e.전달>=0?'var(--y)':'var(--r)'}">
+        ${e.전달.toLocaleString()}원
+      </div>
+    </div>`).join('');
+
+  // 미수 목록
+  const el=document.getElementById('misu-list');
+  const entries=Object.entries(mm).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  el.innerHTML=entries.length
+    ?entries.map(([nm,amt])=>`
+      <div class="misu-item" onclick="openMisuDetail('${nm}')" style="cursor:pointer">
+        <div>
+          <div class="misu-name">${nm}</div>
+          <div style="font-size:10px;color:var(--t3);margin-top:2px">탭하여 상세보기 →</div>
+        </div>
+        <span class="misu-amt">${amt.toLocaleString()}원</span>
+      </div>`).join('')
+    :'<div class="empty"><div class="empty-icon">🎉</div><div style="font-size:13px">미수금 없음</div></div>';
+
+  // 일자별 써머리
+  renderDaySummary();
+}
+
+function renderDaySummary(){
+  // 날짜별 그룹핑
+  const byDate={};
+  allTx.forEach(t=>{
+    if(!byDate[t.날짜]) byDate[t.날짜]={날짜:t.날짜,건수:0,총청구:0,총수익:0,직원:{}};
+    const d=byDate[t.날짜];
+    d.건수++;d.총청구+=t.차감청구;d.총수익+=t.총수익;
+    if(!d.직원[t.직원]) d.직원[t.직원]={건수:0,마진:0,폐유수익:0,총수익:0};
+    d.직원[t.직원].건수++;
+    d.직원[t.직원].마진+=t.식유마진;
+    d.직원[t.직원].폐유수익+=t.폐유수익;
+    d.직원[t.직원].총수익+=t.총수익;
+  });
+
+  // 폐유납품 수입도 합산
+  allWaste.forEach(w=>{
+    const 날짜=String(w.날짜||'').slice(0,10);
+    if(!byDate[날짜]) byDate[날짜]={날짜,건수:0,총청구:0,총수익:0,직원:{}};
+    const d=byDate[날짜];
+    if(!d.직원[w.직원]) d.직원[w.직원]={건수:0,마진:0,폐유수익:0,총수익:0};
+    d.직원[w.직원].폐유수익+=(+w.폐유수입||0);
+    d.직원[w.직원].총수익+=(+w.폐유수입||0);
+    d.총수익+=(+w.폐유수입||0);
+  });
+
+  const sorted=Object.values(byDate).sort((a,b)=>b.날짜.localeCompare(a.날짜));
+  const el=document.getElementById('day-summary-list');
+
+  if(!sorted.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">📅</div><div style="font-size:13px">데이터 없음</div></div>';
+    return;
+  }
+
+  el.innerHTML=sorted.map((d,i)=>{
+    const date=new Date(d.날짜);
+    const dayName=DAYS[date.getDay()];
+    const empRows=Object.entries(d.직원).map(([emp,v])=>`
+      <div class="day-emp-row">
+        <div><div class="day-emp-name">${emp}</div><div class="day-emp-stats">${v.건수}건 · 마진 ${v.마진.toLocaleString()}원 · 폐유 ${v.폐유수익.toLocaleString()}원</div></div>
+        <div class="day-emp-rev">${v.총수익.toLocaleString()}원</div>
+      </div>`).join('');
+
+    return `<div class="day-summary">
+      <div class="day-header" onclick="toggleDay('day-body-${i}')">
+        <div style="display:flex;align-items:center">
+          <span class="day-date">${d.날짜}</span>
+          <span class="day-day">(${dayName}) ${d.건수}건</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="day-total">${d.총수익.toLocaleString()}원</span>
+          <span style="color:var(--t3);font-size:12px">▼</span>
+        </div>
+      </div>
+      <div class="day-body" id="day-body-${i}">${empRows}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleDay(id){
+  const el=document.getElementById(id);
+  el.classList.toggle('show');
+}
+
+function renderHistory(){
+  const emp=document.getElementById('hist-emp').value;
+  let list=allTx;
+  if(emp)list=list.filter(t=>t.직원===emp);
+  list=list.sort((a,b)=>b.id-a.id);
+  const el=document.getElementById('history-list');
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">📝</div><div style="font-size:13px">내역 없음</div></div>';return;}
+  el.innerHTML=list.map(t=>`
+    <div class="tx-card">
+      <div class="tx-top">
+        <div><div class="tx-store">${t.거래처}</div><span class="tx-emp">${t.직원}</span></div>
+        <div style="text-align:right">
+          <div class="tx-date">${t.날짜}</div>
+          <span class="badge ${t.미수?'r':'g'}">${t.수금방법||''}</span>
+          <div style="margin-top:4px"><button class="btn-danger" onclick="deleteTx('${t.id}')">삭제</button></div>
+        </div>
+      </div>
+      <div class="tx-grid">
+        ${t.통수>0?`<div class="tx-detail">납품 <span>${t.통수}통</span></div>`:''}
+        ${t.식유금액>0?`<div class="tx-detail">식유금액 <span>${t.식유금액.toLocaleString()}원</span></div>`:''}
+        ${t.폐유kg>0?`<div class="tx-detail">폐유 <span>${t.폐유kg}kg</span></div>`:''}
+        ${t.식유마진?`<div class="tx-detail">마진 <span>${t.식유마진.toLocaleString()}원</span></div>`:''}
+        ${t.비고?`<div class="tx-detail" style="grid-column:span 2">📌 <span>${t.비고}</span></div>`:''}
+      </div>
+      <div class="tx-bottom">
+        <span style="font-size:12px;color:var(--t2)">청구 ${t.차감청구.toLocaleString()}원</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--g)">${t.총수익.toLocaleString()}원</span>
+      </div>
+    </div>`).join('');
+}
+
+function renderWasteHistory(){
+  const emp=document.getElementById('hist-emp').value;
+  let list=histWaste;
+  if(emp) list=list.filter(w=>(w.직원||w['직원']||'')=== emp);
+  const el=document.getElementById('history-list');
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">♻️</div><div style="font-size:13px">폐유납품 내역 없음</div></div>';return;}
+  el.innerHTML=list.map(w=>{
+    const 날짜=String(w.날짜||w['날짜']||'').slice(0,10);
+    const 직원=w.직원||w['직원']||'';
+    const 파레트=+(w.파레트수||w['파레트수']||0);
+    const 실중량=+(w.총실중량||w['총실중량']||0);
+    const 단가=+(w.매입단가||w['매입단가']||0);
+    const 수입=+(w.폐유수입||w['폐유수입']||0);
+    return `<div class="tx-card">
+      <div class="tx-top">
+        <div><div class="tx-store" style="color:var(--o)">♻️ 폐유납품</div><span class="tx-emp">${직원}</span></div>
+        <div style="text-align:right"><div class="tx-date">${날짜}</div></div>
+      </div>
+      <div class="tx-grid">
+        <div class="tx-detail">파레트 <span>${파레트}개</span></div>
+        <div class="tx-detail">실중량 <span>${실중량.toFixed(1)}kg</span></div>
+        <div class="tx-detail">매입단가 <span>${단가.toLocaleString()}원/kg</span></div>
+      </div>
+      <div class="tx-bottom">
+        <span style="font-size:12px;color:var(--t2)">${실중량.toFixed(1)}kg × ${단가.toLocaleString()}원</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--g)">${수입.toLocaleString()}원</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderPaymentHistory(){
+  const emp=document.getElementById('hist-emp').value;
+  let list=histPayments;
+  if(emp) list=list.filter(p=>(p.직원||p['직원']||'')=== emp);
+  const el=document.getElementById('history-list');
+  if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">💳</div><div style="font-size:13px">입금 내역 없음</div></div>';return;}
+  const total=list.reduce((s,p)=>s+(+(p.금액||p['금액']||0)),0);
+  el.innerHTML=`<div style="background:rgba(63,185,80,.06);border:1px solid rgba(63,185,80,.2);border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between">
+    <span style="font-size:12px;color:var(--t2)">${list.length}건 총 입금</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--g)">${total.toLocaleString()}원</span>
+  </div>`+list.map(p=>{
+    const 날짜=String(p.날짜||p['날짜']||'').slice(0,10);
+    const 거래처=p.거래처||p['거래처']||'';
+    const 직원=p.직원||p['직원']||'';
+    const 금액=+(p.금액||p['금액']||0);
+    const 방법=p.방법||p['방법']||'';
+    const 입금자=p.입금자명||p['입금자명']||'';
+    return `<div class="tx-card">
+      <div class="tx-top">
+        <div><div class="tx-store">${거래처}</div><span class="tx-emp">${직원}</span></div>
+        <div style="text-align:right"><div class="tx-date">${날짜}</div><span class="badge g">${방법}</span></div>
+      </div>
+      <div class="tx-bottom">
+        <span style="font-size:12px;color:var(--t2)">${입금자}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--g)">${금액.toLocaleString()}원</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function deleteTx(id){
+  if(!confirm('삭제할까요?'))return;
+  const month=document.getElementById('hist-month').value;
+  const [y,m]=month.split('-');
+  await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({type:'delete_tx',id,year:+y,month:+m})});
+  showToast('삭제됐어요');
+  await loadHistoryAll();
+}
+
+function renderPrices(){
+  const latest={};
+  allPrices.forEach(p=>{
+    if(!p.품명)return;
+    const key=p.품명==='폐유매입단가'?'_waste':p.품명;
+    if(!latest[key]||new Date(p.적용일자)>=new Date(latest[key].날짜))
+      latest[key]={단가:p.출고가,날짜:String(p.적용일자).slice(0,10),구분:p.구분||''};
+  });
+
+  // 폐유단가 이력 정렬 (최신순)
+  const wastePrices = allPrices
+    .filter(p=>p.품명==='폐유매입단가')
+    .sort((a,b)=>new Date(b.적용일자)-new Date(a.적용일자));
+
+  if(wastePrices.length>0){
+    const cur=wastePrices[0];
+    document.getElementById('waste-cur').textContent=(+cur.출고가).toLocaleString()+'원/kg';
+    document.getElementById('waste-cur-date').textContent=String(cur.적용일자).slice(0,10)+' 부터';
+  }
+  if(wastePrices.length>1){
+    const prev=wastePrices[1];
+    document.getElementById('waste-prev-row').style.display='flex';
+    document.getElementById('waste-prev').textContent=(+prev.출고가).toLocaleString()+'원/kg';
+    document.getElementById('waste-prev-date').textContent=String(prev.적용일자).slice(0,10)+' 부터';
+  } else {
+    document.getElementById('waste-prev-row').style.display='none';
+  }
+
+  const el=document.getElementById('price-list');
+  const items=Object.entries(latest).filter(([k])=>k!=='_waste');
+  el.innerHTML=items.length
+    ?items.map(([nm,v])=>`
+      <div class="price-item">
+        <div><div class="price-name">${nm}<span class="price-tag ${v.구분}">${v.구분}</span></div><div class="price-meta">${v.날짜} 기준</div></div>
+        <div class="price-val">${(+v.단가).toLocaleString()}원</div>
+      </div>`).join('')
+    :'<div class="empty"><div class="empty-icon">💰</div><div style="font-size:13px">단가 없음</div></div>';
+}
+
+async function addWastePrice(){
+  const 단가val=document.getElementById('nw-price').value;
+  const 날짜=document.getElementById('nw-date').value;
+  if(!단가val||!날짜){showToast('단가와 날짜를 입력해주세요');return;}
+
+  // 과거 날짜 차단
+  const today=new Date().toISOString().slice(0,10);
+  if(날짜<today){showToast('⚠️ 과거 날짜는 등록 불가. 오늘 이후 날짜만 가능');return;}
+
+  // 현재 단가 확인
+  const wastePrices=allPrices.filter(p=>p.품명==='폐유매입단가').sort((a,b)=>new Date(b.적용일자)-new Date(a.적용일자));
+  const curPrice=wastePrices.length>0?(+wastePrices[0].출고가).toLocaleString()+'원/kg':'없음';
+
+  if(!confirm(`폐유 단가 변경
+
+현재: ${curPrice}
+변경: ${(+단가val).toLocaleString()}원/kg
+적용일: ${날짜}부터
+
+이 날짜 이후 납품부터 새 단가가 적용됩니다.
+정말 저장할까요?`))return;
+
+  try{
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'waste_price',단가:+단가val,날짜})});
+    const d=await res.json();
+    if(d.ok===false){showToast('⚠️ '+d.error);return;}
+  }catch(e){}
+  showToast('✅ 폐유 단가 변경!');
+  document.getElementById('nw-price').value='';
+  await loadPrices();
+}
+
+async function addPrice(){
+  let 품명=document.getElementById('np-name').value;
+  if(품명==='_custom')품명=document.getElementById('np-custom').value.trim();
+  const 구분=document.getElementById('np-cat').value;
+  const 출고가val=document.getElementById('np-val').value;
+  const 날짜=document.getElementById('np-date').value;
+  if(!품명||!출고가val||!날짜){showToast('필수 항목을 입력해주세요');return;}
+
+  // 과거 날짜 차단
+  const today=new Date().toISOString().slice(0,10);
+  if(날짜<today){showToast('⚠️ 과거 날짜는 등록 불가. 오늘 이후 날짜만 가능');return;}
+
+  // 현재 단가 확인
+  const latest=allPrices.filter(p=>p.품명===품명&&p.품명!=='폐유매입단가').sort((a,b)=>new Date(b.적용일자)-new Date(a.적용일자));
+  const curPrice=latest.length>0?(+latest[0].출고가).toLocaleString()+'원':'없음';
+
+  if(!confirm(`단가 변경 확인
+
+품목: ${품명}
+현재: ${curPrice}
+변경: ${(+출고가val).toLocaleString()}원
+적용일: ${날짜}부터
+
+이 날짜 이후 납품부터 새 단가가 적용됩니다.
+정말 저장할까요?`))return;
+
+  try{
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'price',price:{품명,구분,출고가:+출고가val,날짜,비고:''}})});
+    const d=await res.json();
+    if(d.ok===false){showToast('⚠️ '+d.error);return;}
+  }catch(e){}
+  showToast(`✅ ${품명} 단가 추가!`);
+  document.getElementById('np-val').value='';
+  await loadPrices();
+}
+
+function toggleCustom(){
+  document.getElementById('custom-wrap').style.display=
+    document.getElementById('np-name').value==='_custom'?'block':'none';
+}
+
+function goTab(t){
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',['dashboard','history','prices'][i]===t));
+  document.querySelectorAll('.page').forEach((el,i)=>el.classList.toggle('on',['page-dashboard','page-history','page-prices'][i]===`page-${t}`));
+  if(t==='dashboard')silentRefresh();
+  if(t==='history'){
+    // hist-month 없으면 dash-month 값으로 직접 설정
+    const hm=document.getElementById('hist-month');
+    const dm=document.getElementById('dash-month').value;
+    if(!hm.value) hm.value=dm;
+    loadHistoryAll();
+  }
+  if(t==='prices')loadPrices();
+}
+
+// 폐유단가 수정
+let editWasteIdx = -1;
+
+function openEditWaste(idx){
+  const wastePrices = allPrices
+    .filter(p=>p.품명==='폐유매입단가')
+    .sort((a,b)=>new Date(b.적용일자)-new Date(a.적용일자));
+  if(idx>=wastePrices.length)return;
+  editWasteIdx = idx;
+  const p = wastePrices[idx];
+  document.getElementById('edit-waste-price').value = +p.출고가;
+  document.getElementById('edit-waste-info').textContent = `${idx===0?'현재':'이전'} 단가 수정`;
+  document.getElementById('edit-waste-date-label').textContent = `적용일: ${String(p.적용일자).slice(0,10)} (변경 불가)`;
+  document.getElementById('edit-waste-modal').style.display='flex';
+}
+
+function closeEditWaste(){
+  document.getElementById('edit-waste-modal').style.display='none';
+  editWasteIdx=-1;
+}
+
+async function saveEditWaste(){
+  const wastePrices = allPrices
+    .filter(p=>p.품명==='폐유매입단가')
+    .sort((a,b)=>new Date(b.적용일자)-new Date(a.적용일자));
+  if(editWasteIdx<0||editWasteIdx>=wastePrices.length)return;
+  const p = wastePrices[editWasteIdx];
+  const newPrice = parseFloat(document.getElementById('edit-waste-price').value);
+  if(!newPrice){showToast('단가를 입력해주세요');return;}
+
+  // 구글 시트에서 해당 행 찾아서 업데이트
+  // 방법: 기존 삭제 후 같은 날짜로 재등록
+  try{
+    // 1. 삭제
+    await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'delete_waste_price',날짜:String(p.적용일자).slice(0,10)})});
+    // 2. 새 단가로 재등록
+    await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'waste_price',단가:newPrice,날짜:String(p.적용일자).slice(0,10)})});
+    showToast('✅ 단가 수정됐어요!');
+    closeEditWaste();
+    await loadPrices();
+  }catch(e){showToast('⚠️ 수정 실패');}
+}
+
+async function deleteWastePrice(){
+  const wastePrices = allPrices
+    .filter(p=>p.품명==='폐유매입단가')
+    .sort((a,b)=>new Date(b.적용일자)-new Date(a.적용일자));
+  if(editWasteIdx<0)return;
+  if(!confirm('이 단가를 삭제할까요?'))return;
+  const p = wastePrices[editWasteIdx];
+  try{
+    await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'delete_waste_price',날짜:String(p.적용일자).slice(0,10)})});
+    showToast('삭제됐어요');
+    closeEditWaste();
+    await loadPrices();
+  }catch(e){showToast('⚠️ 삭제 실패');}
+}
+
+// 조용히 갱신 (토스트 없이)
+async function silentRefresh(){
+  try{
+    await Promise.all([loadPrices()]);
+    await loadDashboard();
+    const now=new Date();
+    const timeStr=`${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}:${String(now.getSeconds()).padStart(2,'0')}`;
+    const el=document.getElementById('last-update');
+    if(el) el.textContent=`🔄 ${timeStr} 업데이트`;
+  }catch(e){}
+}
+
+// 30초 폴링
+setInterval(()=>{
+  // 현황 탭이 열려있을 때만
+  if(document.getElementById('page-dashboard').classList.contains('on')){
+    silentRefresh();
+  }
+},30000);
+
+function openMisuDetail(storeName){
+  document.getElementById('misu-detail-modal').style.display='flex';
+  document.getElementById('md-store-name').textContent=storeName;
+
+  // 납품 내역 (미수)
+  const txItems=allTx.filter(t=>t.거래처===storeName&&t.미수);
+  // 입금 내역
+  const payItems=allPayments.filter(p=>(p.거래처||p['거래처'])===storeName);
+
+  const totalTx=txItems.reduce((s,t)=>s+t.차감청구,0);
+  const totalPay=payItems.reduce((s,p)=>s+(+(p.금액||p['금액']||0)),0);
+  const balance=Math.max(0,totalTx-totalPay);
+
+  document.getElementById('md-balance').textContent=balance.toLocaleString()+'원';
+  document.getElementById('md-total-tx').textContent=totalTx.toLocaleString()+'원';
+  document.getElementById('md-total-pay').textContent=totalPay.toLocaleString()+'원';
+
+  // 타임라인 - 납품+입금 합쳐서 날짜순
+  const timeline=[
+    ...txItems.map(t=>({날짜:t.날짜,type:'납품',금액:t.차감청구,직원:t.직원,유종:t.유종,통수:t.통수})),
+    ...payItems.map(p=>({날짜:String(p.날짜||p['날짜']||'').slice(0,10),type:'입금',금액:+(p.금액||p['금액']||0),방법:p.방법||p['방법']||''}))
+  ].sort((a,b)=>a.날짜.localeCompare(b.날짜));
+
+  let running=0;
+  const el=document.getElementById('md-timeline');
+  if(!timeline.length){el.innerHTML='<div class="empty"><div>내역 없음</div></div>';return;}
+
+  el.innerHTML=timeline.map(item=>{
+    if(item.type==='납품'){
+      running+=item.금액;
+      return `<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace">${item.날짜}</div>
+            <div style="font-size:13px;font-weight:700;margin-top:2px">📦 납품 · ${item.직원}</div>
+            <div style="font-size:11px;color:var(--t2);margin-top:2px">${item.유종||''} ${item.통수||0}통</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--r)">+${item.금액.toLocaleString()}원</div>
+            <div style="font-size:10px;color:var(--t3);margin-top:2px">잔액 ${running.toLocaleString()}원</div>
+          </div>
+        </div>
+      </div>`;
+    } else {
+      running=Math.max(0,running-item.금액);
+      return `<div style="background:rgba(63,185,80,.06);border:1px solid rgba(63,185,80,.2);border-radius:12px;padding:12px 14px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace">${item.날짜}</div>
+            <div style="font-size:13px;font-weight:700;margin-top:2px;color:var(--g)">💳 입금 · ${item.방법||''}</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--g)">-${item.금액.toLocaleString()}원</div>
+            <div style="font-size:10px;color:var(--t3);margin-top:2px">잔액 ${running.toLocaleString()}원</div>
+          </div>
+        </div>
+      </div>`;
+    }
+  }).join('');
+}
+
+function closeMisuDetail(){
+  document.getElementById('misu-detail-modal').style.display='none';
+}
+
+function showToast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+init();
+</script>
+</body>
+</html>

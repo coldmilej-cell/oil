@@ -98,6 +98,7 @@ select option{background:#161b22;}
 .store-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;}
 .store-badge.son{background:rgba(240,165,0,.1);color:var(--y);}
 .store-badge.bak{background:rgba(88,166,255,.1);color:var(--b);}
+.store-badge.share{background:rgba(63,185,80,.1);color:var(--g);}
 .store-badge.none{background:var(--card2);color:var(--t3);}
 .store-badge.day{background:rgba(63,185,80,.08);color:var(--g);}
 .store-badge.misu{background:rgba(248,81,73,.1);color:var(--r);}
@@ -108,6 +109,24 @@ select option{background:#161b22;}
 .search-wrap input{width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px 11px 36px;color:var(--t);font-size:14px;font-family:'Noto Sans KR',sans-serif;outline:none;}
 .search-wrap input:focus{border-color:var(--y);}
 .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;}
+
+/* 자동배정 박스 */
+.assign-box{background:linear-gradient(135deg,rgba(240,165,0,.08),rgba(88,166,255,.06));border:1.5px solid rgba(240,165,0,.25);border-radius:14px;padding:14px;margin-bottom:14px;}
+.assign-title{font-size:13px;font-weight:700;color:var(--y);margin-bottom:6px;}
+.assign-desc{font-size:11px;color:var(--t2);margin-bottom:12px;line-height:1.6;}
+.assign-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:12px;}
+.assign-stat{background:var(--card2);border-radius:10px;padding:9px 8px;text-align:center;}
+.assign-stat-val{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;}
+.assign-stat-label{font-size:9px;color:var(--t3);margin-top:3px;}
+.btn-assign{width:100%;padding:12px;background:var(--y2);color:#000;border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:'Noto Sans KR',sans-serif;cursor:pointer;}
+.btn-assign:disabled{background:var(--card2);color:var(--t3);cursor:not-allowed;}
+
+/* 납품횟수 미니 바 */
+.count-bar{display:flex;gap:4px;align-items:center;margin-top:5px;}
+.count-seg{height:4px;border-radius:2px;min-width:3px;}
+.count-seg.son{background:var(--y);}
+.count-seg.bak{background:var(--b);}
+.count-label{font-size:9px;color:var(--t3);}
 </style>
 </head>
 <body>
@@ -205,6 +224,27 @@ select option{background:#161b22;}
     <button onclick="openStoreAdd()" style="padding:9px 14px;background:var(--y2);border:none;border-radius:10px;color:#000;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">+ 추가</button>
   </div>
 
+  <!-- 자동배정 박스 -->
+  <div class="assign-box">
+    <div class="assign-title">🤖 담당자 자동배정</div>
+    <div class="assign-desc">거래처별 전체 납품 횟수를 기준으로 담당자를 자동 배정합니다.<br>동률이면 "공유"로 표시됩니다.</div>
+    <div class="assign-stats" id="assign-stats">
+      <div class="assign-stat">
+        <div class="assign-stat-val" style="color:var(--y)" id="as-son">-</div>
+        <div class="assign-stat-label">손호영</div>
+      </div>
+      <div class="assign-stat">
+        <div class="assign-stat-val" style="color:var(--b)" id="as-bak">-</div>
+        <div class="assign-stat-label">박기빈</div>
+      </div>
+      <div class="assign-stat">
+        <div class="assign-stat-val" style="color:var(--t3)" id="as-none">-</div>
+        <div class="assign-stat-label">미배정</div>
+      </div>
+    </div>
+    <button class="btn-assign" id="btn-assign" onclick="runAutoAssign()">🔄 자동배정 실행 (전체 기간 기준)</button>
+  </div>
+
   <!-- 검색 -->
   <div class="search-wrap">
     <span class="search-icon">🔍</span>
@@ -216,6 +256,7 @@ select option{background:#161b22;}
     <button class="filter-btn on" onclick="setStoreFilter('전체')">전체</button>
     <button class="filter-btn" onclick="setStoreFilter('손호영')">손호영</button>
     <button class="filter-btn" onclick="setStoreFilter('박기빈')">박기빈</button>
+    <button class="filter-btn" onclick="setStoreFilter('공유')">공유</button>
     <button class="filter-btn" onclick="setStoreFilter('미배정')">미배정</button>
     <button class="filter-btn" onclick="setStoreFilter('미수')">미수있음</button>
   </div>
@@ -345,9 +386,11 @@ const API = 'https://script.google.com/macros/s/AKfycbxx1H1Ich2nsHf3iNEpC3NajRuC
 const DAYS=['일','월','화','수','목','금','토'];
 
 let allTx=[], allPayments=[], allWaste=[], allPrices=[], allStores=[];
-let misuMap={}; // 거래처별 미수잔액
+let misuMap={};
 let storeFilter='전체';
 let editingStoreCode=null;
+// 자동배정 결과 캐시: { '거래처명': { son: N, bak: N } }
+let assignCounts={};
 
 async function init(){
   const now=new Date();
@@ -367,6 +410,7 @@ async function loadAll(){
   try{
     await Promise.all([loadMonths(), loadPrices(), loadStores()]);
     await loadDashboard();
+    updateAssignStats();
     showToast('✅ 완료!');
   }catch(e){showToast('⚠️ 연결 실패');}
 }
@@ -382,6 +426,7 @@ async function loadStores(){
   const res=await fetch(API+'?type=stores');
   const d=await res.json();
   allStores=d.stores||[];
+  updateAssignStats();
   renderStores();
 }
 
@@ -543,11 +588,76 @@ function renderDaySummary(){
 
 function toggleDay(id){document.getElementById(id).classList.toggle('show');}
 
+// ===== 자동배정 =====
+function updateAssignStats(){
+  const son=allStores.filter(s=>s.담당==='손호영').length;
+  const bak=allStores.filter(s=>s.담당==='박기빈').length;
+  const none=allStores.filter(s=>!s.담당||s.담당==='공유').length;
+  document.getElementById('as-son').textContent=son;
+  document.getElementById('as-bak').textContent=bak;
+  document.getElementById('as-none').textContent=none;
+}
+
+async function runAutoAssign(){
+  const btn=document.getElementById('btn-assign');
+  btn.disabled=true;
+  btn.textContent='⏳ 전체 데이터 분석 중...';
+  showToast('📊 납품 데이터 분석 중...');
+
+  try{
+    const res=await fetch(`${API}?type=auto_assign`);
+    const d=await res.json();
+    if(!d.assign){showToast('⚠️ 데이터 없음 (납품 내역이 아직 없어요)');btn.disabled=false;btn.textContent='🔄 자동배정 실행 (전체 기간 기준)';return;}
+
+    assignCounts=d.counts||{};
+    const assign=d.assign;
+
+    // 변경될 거래처 미리 계산
+    const toUpdate=allStores.filter(s=>{
+      const suggested=assign[s.이름]||'';
+      return suggested && suggested!==s.담당;
+    });
+
+    if(toUpdate.length===0){
+      showToast('✅ 이미 최신 배정 상태예요!');
+      btn.disabled=false;btn.textContent='🔄 자동배정 실행 (전체 기간 기준)';
+      renderStores();
+      return;
+    }
+
+    // 변경 내역 요약
+    const preview=toUpdate.slice(0,5).map(s=>`• ${s.이름}: ${s.담당||'미배정'} → ${assign[s.이름]}`).join('\n');
+    const more=toUpdate.length>5?`\n... 외 ${toUpdate.length-5}개`:'';
+    if(!confirm(`담당자 자동배정 변경 내역 (${toUpdate.length}개)\n\n${preview}${more}\n\n저장할까요?`)){
+      btn.disabled=false;btn.textContent='🔄 자동배정 실행 (전체 기간 기준)';return;
+    }
+
+    // 순차 업데이트
+    let done=0;
+    for(const s of toUpdate){
+      const updated={...s, 담당:assign[s.이름]||''};
+      await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({type:'store_update',store:updated})});
+      done++;
+      btn.textContent=`⏳ 저장 중... (${done}/${toUpdate.length})`;
+    }
+
+    showToast(`✅ ${toUpdate.length}개 거래처 담당자 배정 완료!`);
+    await loadStores();
+  }catch(e){
+    showToast('⚠️ 자동배정 실패: '+e.message);
+  }finally{
+    btn.disabled=false;
+    btn.textContent='🔄 자동배정 실행 (전체 기간 기준)';
+  }
+}
+
 // ===== 거래처 =====
 function setStoreFilter(f){
   storeFilter=f;
   document.querySelectorAll('.filter-btn').forEach(b=>{
-    b.classList.toggle('on', b.textContent.replace('미수있음','미수')===f||b.textContent===f);
+    const label=b.textContent.replace('미수있음','미수');
+    b.classList.toggle('on', label===f||b.textContent===f);
   });
   renderStores();
 }
@@ -556,16 +666,14 @@ function renderStores(){
   const q=(document.getElementById('store-search').value||'').trim();
   let list=[...allStores];
 
-  // 검색
   if(q) list=list.filter(s=>(s.이름||'').includes(q)||(s.담당||'').includes(q));
 
-  // 필터
   if(storeFilter==='손호영') list=list.filter(s=>s.담당==='손호영');
   else if(storeFilter==='박기빈') list=list.filter(s=>s.담당==='박기빈');
-  else if(storeFilter==='미배정') list=list.filter(s=>!s.담당);
+  else if(storeFilter==='공유') list=list.filter(s=>s.담당==='공유');
+  else if(storeFilter==='미배정') list=list.filter(s=>!s.담당||s.담당==='');
   else if(storeFilter==='미수') list=list.filter(s=>(misuMap[s.이름]||0)>0);
 
-  // 정렬: 미수있음 먼저, 그다음 이름순
   list.sort((a,b)=>{
     const am=misuMap[a.이름]||0, bm=misuMap[b.이름]||0;
     if(am>0&&bm===0)return -1;
@@ -582,8 +690,20 @@ function renderStores(){
 
   el.innerHTML=list.map(s=>{
     const misu=misuMap[s.이름]||0;
-    const empCls=s.담당==='손호영'?'son':s.담당==='박기빈'?'bak':'none';
+    const empCls=s.담당==='손호영'?'son':s.담당==='박기빈'?'bak':s.담당==='공유'?'share':'none';
     const empLabel=s.담당||'미배정';
+
+    // 납품횟수 미니 바
+    const cnt=assignCounts[s.이름];
+    const cntBar=cnt
+      ? `<div class="count-bar">
+          <div class="count-seg son" style="width:${Math.min(60,cnt['손호영']*3)}px"></div>
+          <span class="count-label">손 ${cnt['손호영']||0}</span>
+          <div class="count-seg bak" style="width:${Math.min(60,cnt['박기빈']*3)}px;margin-left:4px"></div>
+          <span class="count-label">박 ${cnt['박기빈']||0}</span>
+        </div>`
+      : '';
+
     return `<div class="store-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="flex:1">
@@ -595,6 +715,7 @@ function renderStores(){
             ${s.유종?`<span class="store-badge" style="background:var(--card2);color:var(--t2)">${s.유종}</span>`:''}
             ${misu>0?`<span class="store-badge misu">미수 ${misu.toLocaleString()}원</span>`:''}
           </div>
+          ${cntBar}
           ${s.비고?`<div style="font-size:11px;color:var(--t3);margin-top:5px">📌 ${s.비고}</div>`:''}
         </div>
         <div style="display:flex;gap:5px;margin-left:8px">
@@ -658,7 +779,6 @@ async function saveStore(){
 
   try{
     if(editingStoreCode){
-      // 수정
       store.코드=editingStoreCode;
       const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({type:'store_update',store})});
@@ -666,7 +786,6 @@ async function saveStore(){
       if(d.ok===false){showToast('⚠️ '+d.error);return;}
       showToast('✅ 수정됐어요!');
     } else {
-      // 추가 - 코드 자동생성
       const maxCode=allStores.reduce((max,s)=>{
         const n=parseInt((s.코드||'C000').replace('C',''))||0;
         return Math.max(max,n);
@@ -906,9 +1025,7 @@ function goTab(t){
     if(!hm.value) hm.value=dm;
     loadHistoryAll();
   }
-  if(t==='stores'){
-    loadStores();
-  }
+  if(t==='stores') loadStores();
   if(t==='prices') loadPrices();
 }
 

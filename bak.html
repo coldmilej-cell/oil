@@ -201,6 +201,21 @@ select option{background:#181c24;}
         <div><div class="store-chip-name" id="chip-name"></div><div style="font-size:11px;color:var(--t2);margin-top:2px" id="chip-meta"></div></div>
         <div class="btn-danger" onclick="clearStore()">✕</div>
       </div>
+      <!-- 거래처 미수금 정보 -->
+      <div id="store-info-box" style="display:none;background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;margin-bottom:10px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.08em">거래처 현황</span>
+          <div id="store-misu-loading" style="font-size:11px;color:var(--t3)">조회중...</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+          <span style="font-size:12px;color:var(--t2)">현재 미수잔액</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700" id="store-misu-amt">-</span>
+        </div>
+        <div style="padding:6px 0">
+          <div style="font-size:11px;color:var(--t3);margin-bottom:4px">최근 납품</div>
+          <div id="store-recent-tx" style="font-size:12px;color:var(--t2)">-</div>
+        </div>
+      </div>
     </div>
 
     <div class="sec-label">납품 품목</div>
@@ -758,9 +773,12 @@ function showDeliveryForm(store){
     const s=stores.find(x=>x.이름===store.이름);
     curStore=s||{이름:store.이름,유종:'',요일:''};
     document.getElementById('store-search-area').style.display='none';
-    document.getElementById('store-selected-area').style.display='none';
+    document.getElementById('store-selected-area').style.display='block';
+    document.getElementById('chip-name').textContent=store.이름;
+    document.getElementById('chip-meta').textContent=`${s?.요일||''}요일 · ${s?.유종||''}`;
     document.getElementById('form-title').textContent=store.이름;
     document.getElementById('form-meta').textContent=`${s?.요일||''}요일 · ${s?.유종||''}`;
+    loadStoreInfo(store.이름);
     // 상차 데이터 자동 입력
     const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
     const cargo=savedCargos.find(c=>c.거래처===store.이름);
@@ -796,6 +814,7 @@ function clearFormOnly(){
   document.getElementById('pay-amount').value='';
   document.getElementById('w-kg').value='';
   document.getElementById('w-price').value='';
+  document.getElementById('w-direct').value='';
 }
 
 function clearStore(){
@@ -835,6 +854,7 @@ function selectStore(name){
   document.getElementById('form-meta').textContent=`${s.요일}요일 · ${s.유종||''}`;
   items=[];itemId=0;document.getElementById('item-list').innerHTML='';
   if(s.유종)addItem(s.유종);
+  loadStoreInfo(s.이름);
   updatePayButtons();calcDelivery();
 }
 
@@ -923,10 +943,16 @@ function updatePayButtons(){
         <div class="pay-btn danger" onclick="selPay(this,'이체지급')">계좌로 지급</div>
       </div>`;
   } else {
+    const misu=window.curStoreMisu||0;
+    const charge=items.reduce((s,i)=>isFeeItem(i.type,today())?s:s+i.qty*i.price,0)-(wasteOn?(parseFloat(document.getElementById('w-direct')?.value)||parseFloat(document.getElementById('w-kg')?.value||0)*parseFloat(document.getElementById('w-price')?.value||0)):0);
+    const showMisuCharge=charge<0&&misu>0;
     container.innerHTML=`
       <div class="pay-row" style="margin-bottom:6px">
         <div class="pay-btn danger on" onclick="selPay(this,'미수')" style="grid-column:span 2;padding:16px;font-size:15px">미수 (나중에 입금)</div>
       </div>
+      ${showMisuCharge?`<div class="pay-row" style="margin-bottom:6px">
+        <div class="pay-btn" onclick="selPay(this,'미수차감')" style="grid-column:span 2;color:var(--y);border-color:var(--y);background:rgba(255,209,102,.08)">💳 미수에서 차감 (잔액 ${misu.toLocaleString()}원)</div>
+      </div>`:''}
       <div class="pay-row">
         <div class="pay-btn" onclick="selPay(this,'현금')">현금결제 (현장수령)</div>
         <div class="pay-btn" onclick="selPay(this,'반품')" style="color:var(--r)">↩️ 반품</div>
@@ -1053,8 +1079,10 @@ async function saveDelivery(){
 async function deleteTxByStore(storeName){
   if(!confirm(`${storeName} 납품을 삭제할까요?`))return;
   const t=today();
-  const tx=txList.find(x=>x.거래처===storeName&&x.날짜===t);
-  if(!tx){showToast('삭제할 납품을 찾을 수 없어요');return;}
+  // 같은 거래처 오늘 납품 중 가장 최근 것 삭제
+  const txs=txList.filter(x=>x.거래처===storeName&&x.날짜===t);
+  if(!txs.length){showToast('삭제할 납품을 찾을 수 없어요');return;}
+  const tx=txs.reduce((a,b)=>a.id>b.id?a:b); // 가장 최근 id
   const now=new Date();
   try{
     const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
@@ -1189,6 +1217,49 @@ async function saveNewStore(){
   buildPayStore();
   selectStore(s.이름);
   showToast('✅ 거래처 추가됐어요!');
+}
+
+// 거래처 미수금 정보 로드
+async function loadStoreInfo(storeName){
+  const box=document.getElementById('store-info-box');
+  const loading=document.getElementById('store-misu-loading');
+  const misuEl=document.getElementById('store-misu-amt');
+  const recentEl=document.getElementById('store-recent-tx');
+  box.style.display='block';
+  loading.textContent='조회중...';
+  try{
+    const now=new Date();
+    const y=now.getFullYear(), m=now.getMonth()+1;
+    const [tr,pr]=await Promise.all([
+      fetch(`${API}?type=tx&year=${y}&month=${m}`).then(r=>r.json()),
+      fetch(`${API}?type=payments&year=${y}&month=${m}`).then(r=>r.json()),
+    ]);
+    const txs=(tr.rows||[]).filter(r=>r.거래처===storeName&&(r.미수===true||r.미수==='TRUE'));
+    const pays=(pr.rows||[]).filter(r=>(r.거래처||r['거래처'])===storeName);
+    const totalTx=txs.reduce((s,r)=>s+(+r.차감청구||0),0);
+    const totalPay=pays.reduce((s,r)=>s+(+r.금액||r['금액']||0),0);
+    const misu=Math.max(0,totalTx-totalPay);
+    misuEl.textContent=misu>0?misu.toLocaleString()+'원':'없음';
+    misuEl.style.color=misu>0?'var(--r)':'var(--g)';
+
+    // 최근 납품
+    const allTx=(tr.rows||[]).filter(r=>r.거래처===storeName);
+    if(allTx.length>0){
+      const last=allTx[allTx.length-1];
+      const 날짜=String(last.날짜||'').slice(0,10);
+      recentEl.textContent=`${날짜} · ${last.유종||''} · ${last.차감청구?Number(last.차감청구).toLocaleString()+'원':''}`;
+    } else {
+      recentEl.textContent='이번달 납품 없음';
+    }
+    loading.textContent='';
+
+    // 미수 있으면 수금방법에 미수차감 추가
+    window.curStoreMisu=misu;
+    updatePayButtons();
+  }catch(e){
+    loading.textContent='조회실패';
+    box.style.display='none';
+  }
 }
 
 function showToast(msg){

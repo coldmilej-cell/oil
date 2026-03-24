@@ -494,14 +494,11 @@ select option{background:#181c24;}
 
   <!-- 식용유 단가 목록 -->
   <div class="inp-wrap" style="margin-bottom:10px">
-    <input class="inp" type="text" id="price-search" placeholder="유종 검색..." oninput="renderPriceTab()" style="font-size:13px">
+    <input class="inp" type="text" id="price-search" placeholder="검색..." oninput="renderPriceTab()" onfocus="renderPriceTab()" style="font-size:13px">
   </div>
   <div id="price-list"></div>
 
-  <!-- 읽기전용 안내 -->
-  <div style="margin-top:12px;padding:10px 14px;background:var(--card2);border-radius:10px;font-size:11px;color:var(--t3);text-align:center">
-    🔒 단가 수정은 사장님 앱에서만 가능합니다
-  </div>
+
 </div>
 
 <!-- 신규 거래처 모달 -->
@@ -1986,7 +1983,7 @@ async function saveNewStore(){
     비고:document.getElementById('ns-note').value.trim()};
   stores.push(s);
   localStorage.setItem('stores_v3',JSON.stringify(stores));
-  try{await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'stores',stores})});}catch(e){}
+  try{await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'store_add',store:s})});}catch(e){}
   closeModal('new-store-modal');
   buildPayStore();
   selectStore(s.이름);

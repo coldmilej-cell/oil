@@ -172,6 +172,19 @@ select option{background:#161b22;}
   <div class="sec-label">일자별 써머리 <span style="color:var(--t3);font-weight:400">(탭 눌러서 펼치기)</span></div>
   <div id="day-summary-list"></div>
 
+  <!-- 계좌 설정 -->
+  <div class="divider"></div>
+  <div class="sec-label">🏦 계좌 관리 <span style="color:var(--t3);font-weight:400;font-size:11px">명세서에 표시됩니다</span></div>
+  <div id="account-list" style="margin-bottom:8px"></div>
+  <div style="display:flex;gap:8px;margin-bottom:4px">
+    <input class="inp" id="new-account-bank" placeholder="은행명 (예: 국민)" style="flex:1">
+    <input class="inp" id="new-account-num" placeholder="계좌번호" style="flex:2">
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:16px">
+    <input class="inp" id="new-account-name" placeholder="예금주" style="flex:1">
+    <button onclick="addAccount()" style="flex:0.6;padding:11px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;color:var(--t);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">+ 추가</button>
+  </div>
+
   <!-- 월마감 -->
   <div class="divider"></div>
   <div class="sec-label">📅 월마감</div>
@@ -419,6 +432,7 @@ async function init(){
   const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const closeMonthEl=document.getElementById('close-month');
   if(closeMonthEl)closeMonthEl.value=ym;
+
   document.getElementById('dash-month').value=ym;
   const todayStr=now.toISOString().slice(0,10);
   document.getElementById('nw-date').value=todayStr;
@@ -690,7 +704,7 @@ function renderStores(){
   const q=(document.getElementById('store-search').value||'').trim();
   let list=[...allStores];
 
-  if(q) list=list.filter(s=>(s.이름||'').includes(q)||(s.담당||'').includes(q));
+  if(q) list=list.filter(s=>matchQ(s.이름,q)||matchQ(s.담당,q));
 
   if(storeFilter==='손호영') list=list.filter(s=>s.담당==='손호영');
   else if(storeFilter==='박기빈') list=list.filter(s=>s.담당==='박기빈');
@@ -1159,6 +1173,7 @@ async function silentRefresh(){
 setInterval(()=>{
   if(document.getElementById('page-dashboard').classList.contains('on')) silentRefresh();
   loadClosingHistory();
+  loadAccounts();
 },30000);
 
 
@@ -1225,6 +1240,81 @@ async function loadClosingHistory(){
           </div>
         </div>`).join('');
   }catch(e){}
+}
+
+// ── 검색 헬퍼: 띄어쓰기 무시 ──
+function matchQ(target, q){
+  if(!q)return true;
+  const t=(target||'').replace(/\s/g,'').toLowerCase();
+  const s=q.replace(/\s/g,'').toLowerCase();
+  return t.includes(s);
+}
+
+// ══════════════ 계좌 관리 ══════════════
+let accounts = [];
+
+async function loadAccounts(){
+  try{
+    const res = await fetch(`${API}?type=config`);
+    const d = await res.json();
+    // 계좌는 account_1, account_2... 키로 저장
+    accounts = [];
+    let i = 1;
+    while(d.config[`account_${i}`]){
+      accounts.push(JSON.parse(d.config[`account_${i}`]));
+      i++;
+    }
+    renderAccounts();
+  }catch(e){}
+}
+
+function renderAccounts(){
+  const el = document.getElementById('account-list');
+  if(!el) return;
+  if(!accounts.length){
+    el.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:8px 0">등록된 계좌 없음</div>';
+    return;
+  }
+  el.innerHTML = accounts.map((a,i) => `
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:13px;font-weight:700">${a.bank} ${a.number}</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:2px">${a.name}</div>
+      </div>
+      <button onclick="deleteAccount(${i})" style="padding:5px 10px;background:rgba(255,107,107,.1);border:1px solid var(--r);border-radius:8px;color:var(--r);font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif">삭제</button>
+    </div>`).join('');
+}
+
+async function addAccount(){
+  const bank = document.getElementById('new-account-bank').value.trim();
+  const number = document.getElementById('new-account-num').value.trim();
+  const name = document.getElementById('new-account-name').value.trim();
+  if(!bank||!number||!name){showToast('은행명, 계좌번호, 예금주 모두 입력해주세요');return;}
+  accounts.push({bank, number, name});
+  await saveAccounts();
+  document.getElementById('new-account-bank').value='';
+  document.getElementById('new-account-num').value='';
+  document.getElementById('new-account-name').value='';
+  renderAccounts();
+  showToast('✅ 계좌 추가됐어요!');
+}
+
+async function deleteAccount(idx){
+  if(!confirm('계좌를 삭제할까요?'))return;
+  accounts.splice(idx,1);
+  await saveAccounts();
+  renderAccounts();
+  showToast('✅ 삭제됐어요');
+}
+
+async function saveAccounts(){
+  // 기존 계좌 키 전부 덮어쓰기
+  for(let i=0; i<Math.max(accounts.length+1, 10); i++){
+    const key = `account_${i+1}`;
+    const value = accounts[i] ? JSON.stringify(accounts[i]) : '';
+    await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({type:'config', key, value, desc:'계좌정보'})});
+  }
 }
 
 function showToast(msg){

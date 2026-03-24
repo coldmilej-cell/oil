@@ -157,6 +157,7 @@ select option{background:#181c24;}
   <div id="pallet-list"></div>
   <button class="btn-add" onclick="addPallet()">+ 파레트 추가</button>
   <div class="result-box" id="waste-total-box" style="display:none;margin-top:10px">
+    <div class="result-row"><span class="rl">총 내린 캔수</span><span class="rv" id="wt-cans">-</span></div>
     <div class="result-row"><span class="rl">총 실중량</span><span class="rv p" id="wt-kg">-</span></div>
     <div class="result-row"><span class="rl">회사 매입단가</span><span class="rv" id="wt-price">-</span></div>
     <div class="result-row"><span class="rl">💰 폐유수입</span><span class="rv g big" id="wt-income">-</span></div>
@@ -737,102 +738,107 @@ function addPallet(){
 }
 function togglePalletExist(id){
   const p=pallets.find(x=>x.id===id);if(!p)return;
+  // 이미 다른 계근에서 이전계근 켜져있으면 차단
+  if(!p.기존있음&&pallets.some(x=>x.id!==id&&x.기존있음)){
+    showToast('⚠️ 이전 폐유 계근은 하루에 한 번만 가능해요');return;
+  }
   p.기존있음=!p.기존있음;
   document.getElementById(`pe-sw-${id}`).classList.toggle('on',p.기존있음);
   document.getElementById(`pe-fields-${id}`).style.display=p.기존있음?'block':'none';
   calcPallet(id);
 }
 function removePallet(id){pallets=pallets.filter(p=>p.id!==id);document.getElementById(`pallet-${id}`)?.remove();calcWasteTotal();}
-const MAX_CAN=60, MAX_KG=1800;
+const MAX_CAN=60, MAX_KG=1800, MAX_KG_PER_CAN=18;
 function calcPallet(id){
   const p=pallets.find(x=>x.id===id);if(!p)return;
-  const ek=p.기존있음?(parseFloat(document.getElementById(`p${id}-ek`)?.value)||0):0;
-  let ec=p.기존있음?(parseFloat(document.getElementById(`p${id}-ec`)?.value)||0):0;
-  let tk=parseFloat(document.getElementById(`p${id}-tk`)?.value)||0;
-  let tc=parseFloat(document.getElementById(`p${id}-tc`)?.value)||0;
-  // ── 리밋 적용 ──
+
+  // ── 입력값 읽기 ──
+  const ekEl=document.getElementById(`p${id}-ek`);
   const ecEl=document.getElementById(`p${id}-ec`);
-  const tcEl=document.getElementById(`p${id}-tc`);
   const tkEl=document.getElementById(`p${id}-tk`);
-  if(ec>MAX_CAN){ec=MAX_CAN;if(ecEl){ecEl.value=ec;ecEl.style.borderColor='var(--r)';}showToast(`⚠️ 기존 캔수 최대 ${MAX_CAN}캔`);}
-  else if(ecEl)ecEl.style.borderColor='';
-  if(tc>MAX_CAN){tc=MAX_CAN;if(tcEl){tcEl.value=tc;tcEl.style.borderColor='var(--r)';}showToast(`⚠️ 내린 캔수 최대 ${MAX_CAN}캔`);}
-  else if(tcEl)tcEl.style.borderColor='';
-  if(tk>MAX_KG){tk=MAX_KG;if(tkEl){tkEl.value=tk;tkEl.style.borderColor='var(--r)';}showToast(`⚠️ 총 중량 최대 ${MAX_KG}kg`);}
-  else if(tkEl)tkEl.style.borderColor='';
-  // ── 레이블 동적 변경 ──
-  const tcLabelEl=document.getElementById(`p${id}-tc-label`);
-  if(tcLabelEl){
-    tcLabelEl.innerHTML=p.기존있음
-      ?'현재 캔수(파레트 위 전체) <span style="color:var(--t3);font-size:10px">최대 60</span>'
-      :'내린 캔수 <span style="color:var(--t3);font-size:10px">최대 60</span>';
-  }
-
-  let real=0, myCanCount=0;
-  let hasError=false;
-
-  if(p.기존있음){
-    // ── 기존캔 있음: 총중량≥기존중량, 현재캔수≥기존캔수 체크 ──
-    if(ek>0&&tk>0&&tk<ek){
-      if(tkEl){tkEl.style.borderColor='var(--r)';}
-      showToast(`⚠️ 총 중량이 기존 중량(${ek}kg)보다 작아요`);
-      hasError=true;
-    } else if(tkEl)tkEl.style.borderColor='';
-    if(ec>0&&tc>0&&tc<ec){
-      if(tcEl){tcEl.style.borderColor='var(--r)';}
-      showToast(`⚠️ 현재 캔수가 기존 캔수(${ec}캔)보다 적어요`);
-      hasError=true;
-    } else if(tcEl)tcEl.style.borderColor='';
-    if(hasError){
-      document.getElementById(`p${id}-res`).style.display='none';
-      calcWasteTotal(); return;
-    }
-    // 내가 올린 캔수 = 현재캔수 - 기존캔수
-    myCanCount=tc-ec;
-    // 내가 올린 실중량 = 총중량 - 기존중량 - 내가올린캔수×1kg
-    real=tk - ek - myCanCount;
-  } else {
-    // ── 기존캔 없음: 총중량 > 20kg(파레트) 체크 ──
-    if(tk>0&&tk<=20){
-      if(tkEl){tkEl.style.borderColor='var(--r)';}
-      showToast('⚠️ 총 중량은 파레트(20kg)보다 커야 해요');
-      document.getElementById(`p${id}-res`).style.display='none';
-      calcWasteTotal(); return;
-    } else if(tkEl)tkEl.style.borderColor='';
-    myCanCount=tc;
-    // 내가 올린 실중량 = 총중량 - 내린캔수×1kg - 파레트20kg
-    real=tk - tc - 20;
-  }
-  // 음수 OK (저울값 그대로), 단 리밋 초과만 차단
-  if(tk>MAX_KG){
-    if(tkEl)tkEl.style.borderColor='var(--r)';
-    showToast(`⚠️ 총 중량 최대 ${MAX_KG}kg`);
-  }
-
-  p.기존중량=ek;p.기존캔=ec;p.총중량=tk;p.캔수=tc;p.실중량=real;p.내린캔수=myCanCount;
-
+  const tcEl=document.getElementById(`p${id}-tc`);
   const resEl=document.getElementById(`p${id}-res`);
   const realEl=document.getElementById(`p${id}-real`);
-  const myCanRow=document.getElementById(`p${id}-mycan-row`);
   const myCanEl=document.getElementById(`p${id}-mycan`);
+  const myCanRow=document.getElementById(`p${id}-mycan-row`);
+  const tcLabelEl=document.getElementById(`p${id}-tc-label`);
 
-  if(tk>0&&tc>0){
-    resEl.style.display='block';
-    realEl.textContent=`${real.toFixed(1)}kg`;
-    realEl.style.color='var(--g)'; // 음수도 정상값 (저울)
-    if(myCanEl)myCanEl.textContent=`${myCanCount}캔`;
-    if(myCanRow)myCanRow.style.display=p.기존있음?'flex':'none'; // 기존캔 있을때만 내린캔수 표시
-  } else resEl.style.display='none';
+  const ek=p.기존있음?(parseFloat(ekEl?.value)||0):0;
+  let ec=p.기존있음?(parseFloat(ecEl?.value)||0):0;
+  let tk=parseFloat(tkEl?.value)||0;
+  let tc=parseFloat(tcEl?.value)||0;
+
+  // ── 레이블 동적 변경 ──
+  if(tcLabelEl) tcLabelEl.innerHTML=p.기존있음
+    ?'현재 캔수(파레트 위 전체) <span style="color:var(--t3);font-size:10px">최대 60</span>'
+    :'내린 캔수 <span style="color:var(--t3);font-size:10px">최대 60</span>';
+
+  // ── 절대 리밋 (캔수/총중량) - 초과 시 자동 보정 ──
+  if(ec>MAX_CAN){ec=MAX_CAN;if(ecEl)ecEl.value=ec;showToast(`기존 캔수 최대 ${MAX_CAN}캔`);}
+  if(tc>MAX_CAN){tc=MAX_CAN;if(tcEl)tcEl.value=tc;showToast(`캔수 최대 ${MAX_CAN}캔`);}
+  if(tk>MAX_KG){tk=MAX_KG;if(tkEl)tkEl.value=tk;showToast(`총 중량 최대 ${MAX_KG}kg`);}
+
+  // ── 모든 입력 초기화: 테두리 리셋 ──
+  [ekEl,ecEl,tkEl,tcEl].forEach(el=>{if(el)el.style.borderColor='';});
+
+  // ── 입력 덜 된 상태면 조용히 숨김 ──
+  const notReady = p.기존있음
+    ? (tk<=0||tc<=0||ek<=20)   // 기존있음: 아직 입력 중
+    : (tk<=20||tc<=0);          // 기존없음: 파레트 포함이라 20 이상이어야 의미있음
+  if(notReady){resEl.style.display='none';p.실중량=0;calcWasteTotal();return;}
+
+  // ── 검증 (에러 시 빨간 테두리 + 결과 숨김) ──
+  let errEl=null, errMsg='';
+  let real=0, myCanCount=0;
+
+  if(p.기존있음){
+    myCanCount=tc-ec;
+    real=tk-ek-myCanCount;
+    if(tk<=ek)          {errEl=tkEl; errMsg=`총 중량은 기존 중량(${ek}kg)보다 커야 해요`;}
+    else if(tc<=ec)     {errEl=tcEl; errMsg=`현재 캔수는 기존 캔수(${ec}캔)보다 많아야 해요`;}
+    else if(real<0)     {errEl=tkEl; errMsg='실중량이 음수예요. 입력값을 확인해주세요';}
+    else if(real>myCanCount*MAX_KG_PER_CAN)
+                        {errEl=tkEl; errMsg=`캔당 최대 ${MAX_KG_PER_CAN}kg (${myCanCount}캔 → 최대 ${myCanCount*MAX_KG_PER_CAN}kg)`;}
+  } else {
+    myCanCount=tc;
+    real=tk-tc-20;
+    if(real<0)          {errEl=tkEl; errMsg='실중량이 음수예요. 입력값을 확인해주세요';}
+    else if(real>tc*MAX_KG_PER_CAN)
+                        {errEl=tkEl; errMsg=`캔당 최대 ${MAX_KG_PER_CAN}kg (${tc}캔 → 최대 ${tc*MAX_KG_PER_CAN}kg)`;}
+  }
+
+  if(errEl){
+    errEl.style.borderColor='var(--r)';
+    showToast('⚠️ '+errMsg);
+    resEl.style.display='none';
+    p.실중량=0; calcWasteTotal(); return;
+  }
+
+  // ── 정상 계산 ──
+  p.기존중량=ek;p.기존캔=ec;p.총중량=tk;p.캔수=tc;p.실중량=real;p.내린캔수=myCanCount;
+  resEl.style.display='block';
+  realEl.textContent=`${real.toFixed(1)}kg`;
+  realEl.style.color='var(--g)';
+  if(myCanEl)myCanEl.textContent=`${myCanCount}캔`;
+  if(myCanRow)myCanRow.style.display=p.기존있음?'flex':'none';
   calcWasteTotal();
 }
 function calcWasteTotal(){
-  const vp=pallets.filter(p=>p.총중량>0);
+  const vp=pallets.filter(p=>p.총중량>0&&p.실중량>0);
   const totalReal=vp.reduce((s,p)=>s+p.실중량,0);
+  const totalCans=vp.reduce((s,p)=>s+(p.내린캔수||p.캔수||0),0);
   const wcp=getWastePriceAt(today());
   const income=Math.round(totalReal*wcp);
   const box=document.getElementById('waste-total-box');
   if(vp.length>0){
     box.style.display='block';
+    const cansEl=document.getElementById('wt-cans');
+    if(cansEl){
+      cansEl.textContent=`${totalCans}캔`;
+      // 60캔 채우면 강조
+      cansEl.style.color=totalCans>=MAX_CAN?'var(--g)':'var(--t)';
+      cansEl.textContent=totalCans>=MAX_CAN?`${totalCans}캔 ✅`:`${totalCans}캔`;
+    }
     document.getElementById('wt-kg').textContent=totalReal.toFixed(1)+'kg';
     document.getElementById('wt-price').textContent=wcp.toLocaleString()+'원/kg';
     document.getElementById('wt-income').textContent=income.toLocaleString()+'원';
@@ -952,7 +958,20 @@ async function saveCheckin(){
   const t=today();
   try{
     if(validPallets.length>0){
-      const delivery={id:Date.now(),날짜:t,직원:EMP,파레트수:validPallets.length,총실중량:totalReal,매입단가:wcp,폐유수입:income,파레트목록:validPallets};
+      const hasExistPallet=validPallets.some(p=>p.기존있음);
+      const existPallet=validPallets.find(p=>p.기존있음);
+      const delivery={
+        id:Date.now(),날짜:t,직원:EMP,
+        파레트수:validPallets.length,총실중량:totalReal,매입단가:wcp,폐유수입:income,
+        이전계근여부:hasExistPallet,
+        기존중량:existPallet?.기존중량||0,
+        기존캔수:existPallet?.기존캔||0,
+        내린캔수:validPallets.reduce((s,p)=>s+(p.내린캔수||p.캔수||0),0),
+        파레트목록:validPallets.map(p=>({
+          총중량:p.총중량,캔수:p.캔수,실중량:p.실중량,
+          기존있음:p.기존있음,기존중량:p.기존중량,기존캔:p.기존캔,내린캔수:p.내린캔수
+        }))
+      };
       try{await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'waste_delivery',delivery})});}catch(e){}
     }
     for(const c of validCargos){

@@ -530,7 +530,7 @@ select option{background:#181c24;}
 <div class="toast" id="toast"></div>
 
 <script>
-const API='https://script.google.com/macros/s/AKfycbxx1H1Ich2nsHf3iNEpC3NajRuCYkcrBf7C5ok_jVrtzAmO4ZrbnJNjLw-J8B99SCId/exec';
+const API='https://script.google.com/macros/s/AKfycbxARKsIxJCoLNUQcdoMxWkqDpa7mbCbfIayopNU1v0HLg7dNuumYc16ipfnvuFs9_r6/exec';
 const EMP='박기빈';
 const DAYS=['일','월','화','수','목','금','토'];
 
@@ -812,11 +812,11 @@ async function saveCheckin(){
   try{
     if(validPallets.length>0){
       const delivery={id:Date.now(),날짜:t,직원:EMP,파레트수:validPallets.length,총실중량:totalReal,매입단가:wcp,폐유수입:income,파레트목록:validPallets};
-      await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'waste_delivery',delivery})});
+      try{await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'waste_delivery',delivery})});}catch(e){}
     }
     for(const c of validCargos){
-      await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({type:'cargo',cargo:{id:Date.now()+Math.random(),날짜:t,직원:EMP,거래처:c.거래처||'',유종:c.유종,통수:c.통수}})});
+      try{await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({type:'cargo',cargo:{id:Date.now()+Math.random(),날짜:t,직원:EMP,거래처:c.거래처||'',유종:c.유종,통수:c.통수}})});}catch(e){}
     }
     // 상차 로컬 저장 (납품탭 연동)
     const savedCargos=validCargos.map(c=>({거래처:c.거래처,유종:c.유종,통수:c.통수}));
@@ -1414,7 +1414,9 @@ async function saveDelivery(){
     비고:document.getElementById('d-note')?.value||''
   };
   try{
-    await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'tx',tx})});
+    const txRes=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'tx',tx})});
+    const txData=await txRes.json();
+    if(txData.ok===false)throw new Error(txData.error||'서버 저장 실패');
     txList.unshift(tx);
     // 로컬엔 최근 7일치만 유지 (서버에서 월별 조회)
     const cutoff=new Date();cutoff.setDate(cutoff.getDate()-7);
@@ -1602,7 +1604,9 @@ async function savePayment(overrideData){
     입금자명:payerName,
     금액:amt,방법:data?.방법||document.getElementById('pay-method').value,
     비고:data?.비고||document.getElementById('pay-note').value};
-  await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'payment',payment})});
+  const payRes=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'payment',payment})});
+  const payData=await payRes.json();
+  if(payData.ok===false)throw new Error(payData.error||'서버 저장 실패');
   todayPayments.unshift(payment);
   localStorage.setItem(`pay_${EMP}_today`,JSON.stringify(todayPayments.slice(0,50)));
   // 입금자명 학습 저장
@@ -1972,7 +1976,7 @@ async function saveNewStore(){
     비고:document.getElementById('ns-note').value.trim()};
   stores.push(s);
   localStorage.setItem('stores_v3',JSON.stringify(stores));
-  await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'stores',stores})});
+  try{await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'stores',stores})});}catch(e){}
   closeModal('new-store-modal');
   buildPayStore();
   selectStore(s.이름);

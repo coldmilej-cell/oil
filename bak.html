@@ -1218,10 +1218,15 @@ function getRouteList(){
   const skipped=JSON.parse(localStorage.getItem(`skip_${EMP}_${today()}`)||'[]');
   // 담당배정 여부 확인
   const hasAssign=stores.some(s=>s.담당);
-  // 내 담당 거래처 (담당 배정됐으면 내것만, 미배정이면 전체 요일 거래처)
+  const hasDay=stores.some(s=>s.요일);
+  // 담당+요일 둘다 있으면 둘다 필터, 담당만 있으면 담당만, 둘다 없으면 전체
   const myStores=hasAssign
-    ? stores.filter(s=>s.요일===today_day&&s.담당===EMP)
-    : stores.filter(s=>s.요일===today_day);
+    ? (hasDay
+        ? stores.filter(s=>s.담당===EMP&&(!s.요일||s.요일===today_day))
+        : stores.filter(s=>s.담당===EMP))
+    : (hasDay
+        ? stores.filter(s=>s.요일===today_day)
+        : stores);
   const names=[...new Set([
     ...savedCargos.filter(c=>c.거래처).map(c=>c.거래처), // 상차한 거래처 (교차납품 포함)
     ...myStores.map(s=>s.이름)
@@ -1797,6 +1802,22 @@ async function saveDelivery(){
   if(!completedRoutes.includes(storeName))completedRoutes.push(storeName);
   localStorage.setItem(`done_${EMP}_${t}`,JSON.stringify(completedRoutes));
   const msg=returnItems.length>0?'↩️ 반품 저장 (차량재고 복귀)':'✅ 저장됐어요!';
+  // 현금지급/이체지급 → 입금탭에 자동 기록
+  if(curPay==='현금지급'||curPay==='이체지급'||curPay==='미수차감폐유'){
+    const payAmt2=wastePay||Math.abs(charge);
+    if(payAmt2>0){
+      await savePayment({
+        거래처:storeName,금액:-payAmt2,날짜:t,
+        입금자명:'폐유대금',방법:curPay==='이체지급'?'계좌이체':'현금지급',비고:'폐유수거 대금 지급'
+      });
+    }
+  }
+  if(curPay==='현금'&&payAmt>0){
+    await savePayment({
+      거래처:storeName,금액:payAmt,날짜:t,
+      입금자명:curStore?.입금자||storeName,방법:'현금',비고:'현장 현금수령'
+    });
+  }
   await safeFetch({type:'tx',tx}, ()=>{
     showToast(msg);
     hideDeliveryForm();
@@ -2009,7 +2030,9 @@ function calcSettlement(){
   const myTx=txList.filter(x=>x.날짜===t&&x.직원===EMP);
   const 현금수령=myTx.filter(x=>x.수금방법==='현금').reduce((s,x)=>s+(+x.수금액||0),0);
   const 폐유지급=myTx.filter(x=>x.수금방법==='현금지급').reduce((s,x)=>s+(+x.수금액||0),0);
-  const 합계=현금수령-폐유지급;
+  // todayPayments의 음수 금액(지급)도 합산
+  const 추가지급=todayPayments.filter(p=>p.날짜===t&&p.금액<0).reduce((s,p)=>s+Math.abs(p.금액),0);
+  const 합계=현금수령-폐유지급-추가지급;
   document.getElementById('settle-cash').textContent=현금수령.toLocaleString()+'원';
   document.getElementById('settle-waste').textContent=폐유지급.toLocaleString()+'원';
   document.getElementById('settle-total').textContent=합계.toLocaleString()+'원';
@@ -2021,20 +2044,27 @@ function renderTodayPayments(){
   const t=today();
   const list=todayPayments.filter(p=>p.날짜===t);
   if(!list.length){el.innerHTML='<div style="font-size:12px;color:var(--t3);padding:8px 0">오늘 입금 없음</div>';return;}
-  el.innerHTML=list.map(p=>`
+  el.innerHTML=list.map(p=>{
+    const isOut=p.금액<0; // 음수 = 우리가 지급
+    const badge=isOut?'<span class="badge r">지급</span>':'<span class="badge g">'+p.방법+'</span>';
+    const amtColor=isOut?'var(--r)':'var(--g)';
+    const amtText=isOut?('-'+Math.abs(p.금액).toLocaleString()):p.금액.toLocaleString();
+    const label=isOut?'폐유대금 지급':p.입금자명||'';
+    return `
     <div class="tx-card">
       <div class="tx-top">
-        <div><div class="tx-store">${p.거래처}</div><span class="badge g">${p.방법}</span></div>
+        <div><div class="tx-store">${p.거래처}</div>${badge}</div>
         <div style="text-align:right">
           <div class="tx-date">${p.날짜}</div>
           <button class="btn-danger" style="font-size:10px;padding:3px 8px;margin-top:4px" onclick="deletePayment(${p.id},'${p.거래처}')">삭제</button>
         </div>
       </div>
       <div class="tx-bottom">
-        <span style="font-size:12px;color:var(--t2)">${p.입금자명||''}</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--g)">${p.금액.toLocaleString()}원</span>
+        <span style="font-size:12px;color:var(--t2)">${label}</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:${amtColor}">${amtText}원</span>
       </div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── 이번달 날짜별 정산 누적 ──

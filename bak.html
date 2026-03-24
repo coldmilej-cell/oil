@@ -624,8 +624,18 @@ async function init(){
       localStorage.setItem('stores_v3',JSON.stringify(stores));
     }
     if(pd.prices?.length){
-      priceHistory=pd.prices.filter(p=>p.품명&&p.품명!=='폐유매입단가').map(p=>({품명:p.품명,출고가:+p.출고가,날짜:String(p.적용일자).slice(0,10)}));
-      wastePriceHistory=pd.prices.filter(p=>p.품명==='폐유매입단가').map(p=>({단가:+p.출고가,날짜:String(p.적용일자).slice(0,10)}));
+      // 적용일자 정규화 (ISO string 또는 날짜 문자열 모두 처리)
+      const normalizeDate=d=>{
+        const s=String(d||'');
+        if(s.includes('T'))return s.slice(0,10); // ISO format
+        return s.slice(0,10);
+      };
+      priceHistory=pd.prices.filter(p=>p.품명&&p.품명!=='폐유매입단가').map(p=>({
+        품명:p.품명,출고가:+p.출고가,날짜:normalizeDate(p.적용일자),구분:p.구분||'범용',비고:p.비고||''
+      }));
+      wastePriceHistory=pd.prices.filter(p=>p.품명==='폐유매입단가').map(p=>({
+        단가:+p.출고가,날짜:normalizeDate(p.적용일자)
+      }));
       localStorage.setItem('priceHistory_v3',JSON.stringify(priceHistory));
       localStorage.setItem('wastePriceHistory_v3',JSON.stringify(wastePriceHistory));
     }
@@ -2253,8 +2263,8 @@ function renderPriceTab(){
           <div style="font-size:10px;color:var(--t3);margin-top:2px">${cur.날짜} 적용</div>
         </div>
         <div style="text-align:right">
-          <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700">
-            ${Number(cur.출고가).toLocaleString()}<span style="font-size:11px;font-weight:400;color:var(--t2)"> ${unit}</span>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:${cur.출고가<0?'var(--o)':'var(--t)'}">
+            ${cur.출고가<0?Math.abs(cur.출고가).toLocaleString()+'원 차감':Number(cur.출고가).toLocaleString()}<span style="font-size:11px;font-weight:400;color:var(--t2)">${cur.출고가>=0?' '+unit:''}</span>
           </div>
           <div style="font-size:11px;margin-top:2px">
             ${prev

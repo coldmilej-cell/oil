@@ -723,12 +723,18 @@ function addPallet(){
       </div>
     </div>
     <div class="grid2">
-      <div class="inp-wrap" style="margin:0"><label>총 중량 (kg) * (최대 1800)</label><input class="inp" type="number" id="p${id}-tk" placeholder="0" inputmode="decimal" max="1800" oninput="calcPallet(${id})"></div>
-      <div class="inp-wrap" style="margin:0"><label>내린 캔수 * (최대 60)</label><input class="inp" type="number" id="p${id}-tc" placeholder="0" inputmode="numeric" max="60" oninput="calcPallet(${id})"></div>
+      <div class="inp-wrap" style="margin:0"><label>총 중량 (kg) <span style="color:var(--t3);font-size:10px">최대 1800</span></label><input class="inp" type="number" id="p${id}-tk" placeholder="0" inputmode="decimal" max="1800" oninput="calcPallet(${id})"></div>
+      <div class="inp-wrap" style="margin:0"><label id="p${id}-tc-label">내린 캔수 <span style="color:var(--t3);font-size:10px">최대 60</span></label><input class="inp" type="number" id="p${id}-tc" placeholder="0" inputmode="numeric" max="60" oninput="calcPallet(${id})"></div>
     </div>
-    <div id="p${id}-res" style="display:none;margin-top:8px;padding:8px 10px;background:rgba(61,220,132,.06);border:1px solid rgba(61,220,132,.15);border-radius:8px;display:none;justify-content:space-between">
-      <span style="font-size:11px;color:var(--t2)">실중량</span>
-      <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700" id="p${id}-real">-</span>
+    <div id="p${id}-res" style="display:none;margin-top:8px;background:rgba(61,220,132,.06);border:1px solid rgba(61,220,132,.15);border-radius:8px;padding:10px 12px">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="font-size:11px;color:var(--t2)">실중량</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700" id="p${id}-real">-</span>
+      </div>
+      <div style="display:flex;justify-content:space-between" id="p${id}-mycan-row">
+        <span style="font-size:11px;color:var(--t2)">내가 내린 캔수</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--p)" id="p${id}-mycan">-</span>
+      </div>
     </div>`;
   document.getElementById('pallet-list').appendChild(el);
 }
@@ -757,14 +763,46 @@ function calcPallet(id){
   else if(tcEl)tcEl.style.borderColor='';
   if(tk>MAX_KG){tk=MAX_KG;if(tkEl){tkEl.value=tk;tkEl.style.borderColor='var(--r)';}showToast(`⚠️ 총 중량 최대 ${MAX_KG}kg`);}
   else if(tkEl)tkEl.style.borderColor='';
-  const real=p.기존있음?tk-ek-tc:tk-20-tc;
-  p.기존중량=ek;p.기존캔=ec;p.총중량=tk;p.캔수=tc;p.실중량=real;
+  // ── 레이블 동적 변경 ──
+  const tcLabelEl=document.getElementById(`p${id}-tc-label`);
+  if(tcLabelEl){
+    tcLabelEl.innerHTML=p.기존있음
+      ?'현재 캔수(파레트 위 전체) <span style="color:var(--t3);font-size:10px">최대 60</span>'
+      :'내린 캔수 <span style="color:var(--t3);font-size:10px">최대 60</span>';
+  }
+
+  let real=0, myCanCount=0;
+  if(p.기존있음){
+    // 실중량 = 총중량 - 기존중량 - (현재캔수 - 기존캔수) × 1kg
+    // 내가 내린 캔수 = 현재캔수 - 기존캔수
+    myCanCount=Math.max(0, tc-ec);
+    real=tk - ek - myCanCount;
+  } else {
+    // 실중량 = 총중량 - 내린캔수(×1kg) - 파레트20kg
+    myCanCount=tc;
+    real=tk - tc - 20;
+  }
+
+  // 리밋 검증: 실중량도 MAX_KG 초과 불가
+  if(real>MAX_KG){
+    real=MAX_KG;
+    if(tkEl){tkEl.style.borderColor='var(--r)';}
+    showToast(`⚠️ 실중량 최대 ${MAX_KG}kg 초과`);
+  }
+
+  p.기존중량=ek;p.기존캔=ec;p.총중량=tk;p.캔수=tc;p.실중량=real;p.내린캔수=myCanCount;
+
   const resEl=document.getElementById(`p${id}-res`);
   const realEl=document.getElementById(`p${id}-real`);
+  const myCanRow=document.getElementById(`p${id}-mycan-row`);
+  const myCanEl=document.getElementById(`p${id}-mycan`);
+
   if(tk>0&&tc>0){
-    resEl.style.display='flex';
+    resEl.style.display='block';
     realEl.textContent=`${real.toFixed(1)}kg`;
     realEl.style.color=real<0?'var(--r)':'var(--g)';
+    if(myCanEl)myCanEl.textContent=`${myCanCount}캔`;
+    if(myCanRow)myCanRow.style.display=p.기존있음?'flex':'none'; // 기존캔 있을때만 내린캔수 표시
   } else resEl.style.display='none';
   calcWasteTotal();
 }

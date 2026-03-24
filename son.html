@@ -771,22 +771,41 @@ function calcPallet(id){
       :'내린 캔수 <span style="color:var(--t3);font-size:10px">최대 60</span>';
   }
 
+  // ── 기존캔 있을 때: 총중량 ≥ 기존중량, 현재캔수 ≥ 기존캔수 검증 ──
+  if(p.기존있음){
+    if(ek>0&&tk>0&&tk<ek){
+      if(tkEl){tkEl.style.borderColor='var(--r)';}
+      showToast(`⚠️ 총 중량은 기존 중량(${ek}kg)보다 커야 해요`);
+      document.getElementById(`p${id}-res`).style.display='none';
+      calcWasteTotal(); return;
+    } else if(tkEl&&tk>=ek) tkEl.style.borderColor='';
+    if(ec>0&&tc>0&&tc<ec){
+      if(tcEl){tcEl.style.borderColor='var(--r)';}
+      showToast(`⚠️ 현재 캔수는 기존 캔수(${ec}캔)보다 많아야 해요`);
+      document.getElementById(`p${id}-res`).style.display='none';
+      calcWasteTotal(); return;
+    } else if(tcEl&&tc>=ec) tcEl.style.borderColor='';
+  }
+
   let real=0, myCanCount=0;
   if(p.기존있음){
-    // 실중량 = 총중량 - 기존중량 - (현재캔수 - 기존캔수) × 1kg
-    // 내가 내린 캔수 = 현재캔수 - 기존캔수
     myCanCount=Math.max(0, tc-ec);
     real=tk - ek - myCanCount;
   } else {
-    // 실중량 = 총중량 - 내린캔수(×1kg) - 파레트20kg
+    // 기존캔 없음: 총중량 > 20kg (파레트 무게) 검증
+    if(tk>0&&tk<=20){
+      if(tkEl){tkEl.style.borderColor='var(--r)';}
+      showToast('⚠️ 총 중량은 파레트 무게(20kg)보다 커야 해요');
+      document.getElementById(`p${id}-res`).style.display='none';
+      calcWasteTotal(); return;
+    } else if(tkEl&&tk>20) tkEl.style.borderColor='';
     myCanCount=tc;
     real=tk - tc - 20;
   }
 
-  // 리밋 검증: 실중량도 MAX_KG 초과 불가
   if(real>MAX_KG){
     real=MAX_KG;
-    if(tkEl){tkEl.style.borderColor='var(--r)';}
+    if(tkEl)tkEl.style.borderColor='var(--r)';
     showToast(`⚠️ 실중량 최대 ${MAX_KG}kg 초과`);
   }
 

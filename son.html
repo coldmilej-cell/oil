@@ -617,10 +617,14 @@ async function init(){
   document.getElementById('hist-month-label').textContent=ym;
 
   try{
-    const [sr,pr]=await Promise.all([fetch(API+'?type=stores'),fetch(API+'?type=prices')]);
+    const fetchOpts={signal:AbortSignal.timeout?AbortSignal.timeout(8000):undefined};
+    const [sr,pr]=await Promise.all([
+      fetch(API+'?type=stores',fetchOpts),
+      fetch(API+'?type=prices',fetchOpts)
+    ]);
     const sd=await sr.json(),pd=await pr.json();
     if(sd.stores?.length){
-      stores=sd.stores.map(s=>({코드:s.코드||'',이름:s.이름||'',담당:s.담당||'',요일:s.요일||'',유종:s.유종||'',입금자:s.입금자||'',비고:s.비고||''}));
+      stores=sd.stores.map(s=>({코드:s.코드||'',이름:s.이름||'',담당:s.담당||'',요일:s.요일||'',유종:s.유종||'',연락처:s.연락처||'',입금자:s.입금자||'',계좌:s.계좌||'',비고:s.비고||''}));
       localStorage.setItem('stores_v3',JSON.stringify(stores));
     }
     if(pd.prices?.length){
@@ -642,8 +646,9 @@ async function init(){
     document.getElementById('sync-status').textContent='✅';
     document.getElementById('sync-status').title='서버 연결됨';
   }catch(e){
-    document.getElementById('sync-status').textContent='📴 오프라인';
-    document.getElementById('sync-status').title='서버 연결 실패: '+e.message;
+    document.getElementById('sync-status').textContent='📴';
+    document.getElementById('sync-status').title='연결실패: '+e.message+' (탭하면 재시도)';
+    console.error('init 에러:', e);
     document.getElementById('sync-status').style.cursor='pointer';
     document.getElementById('sync-status').onclick=()=>init(); // 탭하면 재연결
   }

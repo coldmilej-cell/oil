@@ -454,7 +454,14 @@ select option{background:#181c24;}
 <!-- 내역 -->
 <div class="page" id="page-history">
   <div class="page-hdr">
-    <div><div class="page-title">📋 내 내역</div><div style="font-size:11px;color:var(--t3)" id="hist-month-label"></div></div>
+    <div><div class="page-title">📋 내 내역</div></div>
+  </div>
+  <!-- 월 선택 -->
+  <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+    <input type="month" id="hist-month-sel"
+      style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
+      onchange="renderHistory()">
+    <button onclick="renderHistory()" style="padding:10px 14px;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap">조회</button>
   </div>
   <div id="history-list"></div>
 </div>
@@ -1180,7 +1187,8 @@ function calcDelivery(){
       wasteKg=0; wastePriceVal=0;
     }
     const wcp=getWastePriceAt(today());
-    wasteRev=wasteModeCalc?Math.round(wasteKg*Math.max(0,wcp-wastePriceVal)):0;
+    // 반품(음수kg)이면 wasteRev도 음수 (폐유 돌려줌)
+    wasteRev=wasteModeCalc?Math.round(wasteKg*(wcp-wastePriceVal)):0;
   }
   const wcp=getWastePriceAt(today());
   const charge=oilTotal-wastePay;
@@ -1224,7 +1232,7 @@ async function saveDelivery(){
       wastePay=parseFloat(document.getElementById('w-direct')?.value)||0;
     }
     const wcp2=getWastePriceAt(t);
-    wasteRev=wasteModeCalc?Math.round(wasteKg*Math.max(0,wcp2-wastePriceVal)):0;
+    wasteRev=wasteModeCalc?Math.round(wasteKg*(wcp2-wastePriceVal)):0;
   }
   const wcp=getWastePriceAt(t);
   const charge=oilTotal-wastePay;
@@ -1725,19 +1733,23 @@ async function confirmAllMatches(){
 // ══════════════ 내역 ══════════════
 async function renderHistory(){
   const now=new Date();
-  const month=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const defaultMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  // 월 선택 input 초기화
+  const selEl=document.getElementById('hist-month-sel');
+  if(selEl&&!selEl.value) selEl.value=defaultMonth;
+  const month=selEl?.value||defaultMonth;
+  const [yy,mm]=month.split('-');
   const el=document.getElementById('history-list');
   el.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3)">⏳ 불러오는 중...</div>';
   // 로컬에서 먼저, 없으면 서버에서 가져오기
   let list=txList.filter(t=>t.날짜.startsWith(month));
   if(!list.length){
     try{
-      const res=await fetch(`${API}?type=tx&year=${now.getFullYear()}&month=${now.getMonth()+1}&limit=500`);
+      const res=await fetch(`${API}?type=tx&year=${yy}&month=${+mm}&limit=500`);
       const d=await res.json();
       if(d.rows?.length){
-        list=d.rows;
-        // 로컬 병합
-        d.rows.forEach(r=>{if(!txList.find(x=>x.id==r.ID))txList.unshift({...r,id:r.ID});});
+        list=d.rows.map(r=>({...r,id:r.ID||r.id}));
+        d.rows.forEach(r=>{if(!txList.find(x=>String(x.id)===String(r.ID)))txList.unshift({...r,id:r.ID});});
       }
     }catch(e){}
   }

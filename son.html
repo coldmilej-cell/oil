@@ -771,42 +771,45 @@ function calcPallet(id){
       :'내린 캔수 <span style="color:var(--t3);font-size:10px">최대 60</span>';
   }
 
-  // ── 기존캔 있을 때: 총중량 ≥ 기존중량, 현재캔수 ≥ 기존캔수 검증 ──
+  let real=0, myCanCount=0;
+  let hasError=false;
+
   if(p.기존있음){
+    // ── 기존캔 있음: 총중량≥기존중량, 현재캔수≥기존캔수 체크 ──
     if(ek>0&&tk>0&&tk<ek){
       if(tkEl){tkEl.style.borderColor='var(--r)';}
-      showToast(`⚠️ 총 중량은 기존 중량(${ek}kg)보다 커야 해요`);
-      document.getElementById(`p${id}-res`).style.display='none';
-      calcWasteTotal(); return;
-    } else if(tkEl&&tk>=ek) tkEl.style.borderColor='';
+      showToast(`⚠️ 총 중량이 기존 중량(${ek}kg)보다 작아요`);
+      hasError=true;
+    } else if(tkEl)tkEl.style.borderColor='';
     if(ec>0&&tc>0&&tc<ec){
       if(tcEl){tcEl.style.borderColor='var(--r)';}
-      showToast(`⚠️ 현재 캔수는 기존 캔수(${ec}캔)보다 많아야 해요`);
+      showToast(`⚠️ 현재 캔수가 기존 캔수(${ec}캔)보다 적어요`);
+      hasError=true;
+    } else if(tcEl)tcEl.style.borderColor='';
+    if(hasError){
       document.getElementById(`p${id}-res`).style.display='none';
       calcWasteTotal(); return;
-    } else if(tcEl&&tc>=ec) tcEl.style.borderColor='';
-  }
-
-  let real=0, myCanCount=0;
-  if(p.기존있음){
-    myCanCount=Math.max(0, tc-ec);
+    }
+    // 내가 올린 캔수 = 현재캔수 - 기존캔수
+    myCanCount=tc-ec;
+    // 내가 올린 실중량 = 총중량 - 기존중량 - 내가올린캔수×1kg
     real=tk - ek - myCanCount;
   } else {
-    // 기존캔 없음: 총중량 > 20kg (파레트 무게) 검증
+    // ── 기존캔 없음: 총중량 > 20kg(파레트) 체크 ──
     if(tk>0&&tk<=20){
       if(tkEl){tkEl.style.borderColor='var(--r)';}
-      showToast('⚠️ 총 중량은 파레트 무게(20kg)보다 커야 해요');
+      showToast('⚠️ 총 중량은 파레트(20kg)보다 커야 해요');
       document.getElementById(`p${id}-res`).style.display='none';
       calcWasteTotal(); return;
-    } else if(tkEl&&tk>20) tkEl.style.borderColor='';
+    } else if(tkEl)tkEl.style.borderColor='';
     myCanCount=tc;
+    // 내가 올린 실중량 = 총중량 - 내린캔수×1kg - 파레트20kg
     real=tk - tc - 20;
   }
-
-  if(real>MAX_KG){
-    real=MAX_KG;
+  // 음수 OK (저울값 그대로), 단 리밋 초과만 차단
+  if(tk>MAX_KG){
     if(tkEl)tkEl.style.borderColor='var(--r)';
-    showToast(`⚠️ 실중량 최대 ${MAX_KG}kg 초과`);
+    showToast(`⚠️ 총 중량 최대 ${MAX_KG}kg`);
   }
 
   p.기존중량=ek;p.기존캔=ec;p.총중량=tk;p.캔수=tc;p.실중량=real;p.내린캔수=myCanCount;
@@ -819,7 +822,7 @@ function calcPallet(id){
   if(tk>0&&tc>0){
     resEl.style.display='block';
     realEl.textContent=`${real.toFixed(1)}kg`;
-    realEl.style.color=real<0?'var(--r)':'var(--g)';
+    realEl.style.color='var(--g)'; // 음수도 정상값 (저울)
     if(myCanEl)myCanEl.textContent=`${myCanCount}캔`;
     if(myCanRow)myCanRow.style.display=p.기존있음?'flex':'none'; // 기존캔 있을때만 내린캔수 표시
   } else resEl.style.display='none';

@@ -17,6 +17,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--t);m
 .tab{flex:1;padding:13px 2px;text-align:center;font-size:10px;font-weight:600;color:var(--t3);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;}
 .tab.on{color:var(--p);border-bottom-color:var(--p);}
 .page{display:none;padding:16px 16px 80px;}
+#page-delivery{padding-bottom:120px;}
 .page.on{display:block;}
 .sec-label{font-size:10px;font-weight:700;letter-spacing:.12em;color:var(--t3);text-transform:uppercase;margin-bottom:10px;}
 .card{background:var(--card);border:1px solid var(--border);border-radius:var(--R);padding:14px;margin-bottom:10px;}
@@ -145,7 +146,16 @@ select option{background:#181c24;}
 
   <div class="divider"></div>
 
-  <div class="sec-label">🚗 오늘 방문</div>
+  <!-- 기존재고 (전날 이월) -->
+  <div id="carry-over-section" style="display:none;margin-bottom:4px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div class="sec-label" style="margin:0">📦 차량 이월재고</div>
+      <span style="font-size:10px;color:var(--t3)">전날 미납품 물량</span>
+    </div>
+    <div id="carry-over-list"></div>
+  </div>
+
+  <div class="sec-label">🚗 오늘 방문 / 상차</div>
   <div id="cargo-list"></div>
   <button class="btn-add" onclick="addCargo()">+ 방문 거래처 추가</button>
 
@@ -177,7 +187,28 @@ select option{background:#181c24;}
       <div style="font-size:12px;font-weight:700;color:var(--g)" id="route-progress"></div>
     </div>
     <div id="route-list"></div>
-    <button class="btn-add" style="margin-top:4px" onclick="showDeliveryForm(null)">+ 신규 / 추가 납품</button>
+    <button class="btn-add" style="margin-top:4px;margin-bottom:60px" onclick="showDeliveryForm(null)">+ 신규 / 추가 납품</button>
+  </div>
+
+  <!-- 납품탭 하단 고정 현황바 -->
+  <div id="daily-bar" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;background:var(--card);border-top:1px solid var(--border);padding:10px 16px;z-index:50;display:none">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+      <div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">📦 상차</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--p)" id="bar-loaded">-</div>
+        <div style="font-size:9px;color:var(--t3)">통</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">✅납품 / 🔲잔여</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700" id="bar-done-remain">-</div>
+        <div style="font-size:9px;color:var(--t3)">통</div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">♻️ 수거폐유</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--o)" id="bar-waste-kg">-</div>
+        <div style="font-size:9px;color:var(--t3)">kg</div>
+      </div>
+    </div>
   </div>
 
   <!-- 납품 입력 폼 -->
@@ -423,6 +454,7 @@ async function init(){
 
   buildNsTypeOptions();
   buildPayStore();
+  renderCarryOver();
   renderRoute();
   renderCheckinHistory();
   renderTodayPayments();
@@ -444,7 +476,8 @@ function buildPayStore(){
 function goTab(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',['checkin','delivery','payment','history'][i]===t));
   document.querySelectorAll('.page').forEach((el,i)=>el.classList.toggle('on',['page-checkin','page-delivery','page-payment','page-history'][i]===`page-${t}`));
-  if(t==='delivery'){hideDeliveryForm();renderRoute();}
+  if(t==='delivery'){hideDeliveryForm();renderRoute();document.getElementById('daily-bar').style.display='block';}
+  else{document.getElementById('daily-bar').style.display='none';}
   if(t==='payment'){renderTodayPayments();calcSettlement();}
   if(t==='history')renderHistory();
 }
@@ -527,7 +560,7 @@ function addCargo(){
   const el=document.createElement('div');
   el.className='cargo-card';el.id=`cargo-${id}`;
   const today_day=DAYS[new Date().getDay()];
-  const storeOpts=stores.filter(s=>s.요일===today_day).map(s=>`<option value="${s.이름}">${s.이름}</option>`).join('');
+  const storeOpts=stores.map(s=>`<option value="${s.이름}">${s.이름} (${s.요일})</option>`).join('');
   const typeOpts=getTypeOptions().map(t=>`<option value="${t}">${t}</option>`).join('');
   el.innerHTML=`
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
@@ -618,7 +651,13 @@ async function saveCheckin(){
     }
     // 상차 로컬 저장 (납품탭 연동)
     const savedCargos=validCargos.map(c=>({거래처:c.거래처,유종:c.유종,통수:c.통수}));
-    localStorage.setItem(`cargo_today_${EMP}`,JSON.stringify(savedCargos));
+    const prevCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
+    const mergedCargos=[...prevCargos];
+    savedCargos.forEach(nc=>{
+      const ex=mergedCargos.find(x=>x.거래처===nc.거래처&&x.유종===nc.유종);
+      if(ex)ex.통수+=nc.통수; else mergedCargos.push({...nc});
+    });
+    localStorage.setItem(`cargo_today_${EMP}`,JSON.stringify(mergedCargos));
     // 출근 로그
     const log=JSON.parse(localStorage.getItem(`checkin_log_${EMP}_${t}`)||'[]');
     log.push({id:Date.now(),폐유:{파레트수:validPallets.length,실중량:totalReal,수입:income},상차:savedCargos});
@@ -703,6 +742,7 @@ function renderRoute(){
     el.innerHTML='<div class="empty"><div class="empty-icon">📍</div><div>루트 없음<br><span style="font-size:10px">출근탭에서 상차를 입력하거나<br>거래처 요일을 등록해주세요</span></div></div>';
     if(prog)prog.textContent='';return;
   }
+  updateDailyBar();
   const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
   const doneCount=completedRoutes.filter(n=>list.includes(n)).length;
   if(prog)prog.textContent=`${doneCount}/${list.length}`;
@@ -1072,6 +1112,7 @@ async function saveDelivery(){
     hideDeliveryForm();
     renderRoute();
     renderHistory();
+    updateDailyBar();
   }catch(e){showToast('⚠️ 저장 실패');}
 }
 
@@ -1260,6 +1301,79 @@ async function loadStoreInfo(storeName){
     loading.textContent='조회실패';
     box.style.display='none';
   }
+}
+
+
+// ══════════════ 이월재고 ══════════════
+function renderCarryOver(){
+  const yesterday=new Date();
+  yesterday.setDate(yesterday.getDate()-1);
+  const yd=yesterday.toISOString().slice(0,10);
+  const ydLog=JSON.parse(localStorage.getItem(`checkin_log_${EMP}_${yd}`)||'[]');
+  const ydCargos={};
+  ydLog.forEach(log=>{
+    log.상차.forEach(c=>{
+      if(!c.유종||!c.통수)return;
+      ydCargos[c.유종]=(ydCargos[c.유종]||0)+c.통수;
+    });
+  });
+  const ydTx=JSON.parse(localStorage.getItem(`tx_${EMP}_v3`)||'[]').filter(x=>x.날짜===yd);
+  const ydDone={};
+  ydTx.forEach(tx=>{
+    if(!tx.유종||!tx.통수)return;
+    tx.유종.split('/').forEach(type=>{
+      if(!type)return;
+      ydDone[type]=(ydDone[type]||0)+(tx.통수/(tx.유종.split('/').filter(Boolean).length));
+    });
+  });
+  const carryOver={};
+  Object.entries(ydCargos).forEach(([type,qty])=>{
+    const remain=Math.max(0,qty-Math.round(ydDone[type]||0));
+    if(remain>0)carryOver[type]=remain;
+  });
+  const todayCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
+  const sec=document.getElementById('carry-over-section');
+  const el=document.getElementById('carry-over-list');
+  if(!Object.keys(carryOver).length){sec.style.display='none';return;}
+  sec.style.display='block';
+  el.innerHTML=Object.entries(carryOver).map(([type,qty])=>{
+    const price=getPriceAt(type,today())||0;
+    return `<div style="background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.2);border-radius:10px;padding:10px 13px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:13px;font-weight:700">${type}</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:2px">오늘 단가 ${price.toLocaleString()}원/통 적용</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;color:var(--o)">${qty}통</div>
+        <div style="font-size:10px;color:var(--t3)">이월</div>
+      </div>
+    </div>`;
+  }).join('');
+  Object.entries(carryOver).forEach(([type,qty])=>{
+    const already=todayCargos.find(c=>c.유종===type&&c.거래처==='');
+    if(!already) todayCargos.push({거래처:'',유종:type,통수:qty,이월:true});
+  });
+  localStorage.setItem(`cargo_today_${EMP}`,JSON.stringify(todayCargos));
+}
+
+// ══════════════ 하단 데일리바 ══════════════
+function updateDailyBar(){
+  const bar=document.getElementById('daily-bar');
+  if(!bar)return;
+  const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
+  const totalLoaded=savedCargos.reduce((s,c)=>s+(c.통수||0),0);
+  const t=today();
+  const doneTx=txList.filter(x=>x.날짜===t);
+  const totalDone=doneTx.reduce((s,x)=>s+(x.통수||0),0);
+  const remain=Math.max(0,totalLoaded-totalDone);
+  const totalWasteKg=doneTx.reduce((s,x)=>s+(+x.폐유kg||0),0);
+  if(totalLoaded===0){bar.style.display='none';return;}
+  bar.style.display='block';
+  document.getElementById('bar-loaded').textContent=totalLoaded;
+  const doneEl=document.getElementById('bar-done-remain');
+  doneEl.textContent=`${totalDone} / ${remain}`;
+  doneEl.style.color=remain===0?'var(--g)':'var(--y)';
+  document.getElementById('bar-waste-kg').textContent=totalWasteKg>0?totalWasteKg.toFixed(1):'-';
 }
 
 function showToast(msg){

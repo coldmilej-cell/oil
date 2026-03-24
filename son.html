@@ -907,12 +907,16 @@ function getRouteList(){
   const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
   const today_day=DAYS[new Date().getDay()];
   const skipped=JSON.parse(localStorage.getItem(`skip_${EMP}_${today()}`)||'[]');
-  // 상차한 거래처 + 오늘 요일 거래처
+  // 담당배정 여부 확인
+  const hasAssign=stores.some(s=>s.담당);
+  // 내 담당 거래처 (담당 배정됐으면 내것만, 미배정이면 전체 요일 거래처)
+  const myStores=hasAssign
+    ? stores.filter(s=>s.요일===today_day&&s.담당===EMP)
+    : stores.filter(s=>s.요일===today_day);
   const names=[...new Set([
-    ...savedCargos.filter(c=>c.거래처).map(c=>c.거래처),
-    ...stores.filter(s=>s.요일===today_day).map(s=>s.이름)
-  ])].filter(n=>!skipped.includes(n)); // 스킵된 거래처 제외
-  // routeOrder 적용
+    ...savedCargos.filter(c=>c.거래처).map(c=>c.거래처), // 상차한 거래처 (교차납품 포함)
+    ...myStores.map(s=>s.이름)
+  ])].filter(n=>!skipped.includes(n));
   const ordered=[];
   routeOrder.forEach(n=>{if(names.includes(n))ordered.push(n);});
   names.forEach(n=>{if(!ordered.includes(n))ordered.push(n);});
@@ -935,11 +939,13 @@ function renderRoute(){
     const done=completedRoutes.includes(name);
     const s=stores.find(x=>x.이름===name);
     const cargo=savedCargos.find(c=>c.거래처===name);
+    const isMine=!s?.담당||s?.담당===EMP;
     const meta=cargo?`📦 ${cargo.유종} ${cargo.통수}통 상차`:(s?.유종||'유종미등록');
+    const crossLabel=!isMine&&s?.담당?`<span style="font-size:9px;color:var(--o);margin-left:4px">↔ ${s.담당}</span>`:'';
     return `<div class="route-item ${done?'done':''}" id="ri-${i}" data-name="${name}">
       <div class="route-order" style="background:${done?'var(--g)':'var(--p2)'};flex-shrink:0">${done?'✓':i+1}</div>
       <div class="route-info" onclick="openDelivery('${name}')">
-        <div class="route-name">${name}</div>
+        <div class="route-name">${name}${crossLabel}</div>
         <div class="route-meta" style="color:${cargo?'var(--o)':'var(--t2)'}">${meta}</div>
       </div>
       ${done
@@ -1068,7 +1074,11 @@ function onSearch(){
   }
   let html=filtered.map(s=>`
     <div class="search-item" onclick="selectStore('${s.이름}')">
-      <div class="search-name">${s.이름} ${s.요일===today_day?'<span style="color:var(--g);font-size:10px">● 오늘</span>':''}</div>
+      <div class="search-name">
+        ${s.이름}
+        ${s.요일===today_day?'<span style="color:var(--g);font-size:10px"> ● 오늘</span>':''}
+        ${s.담당&&s.담당!==EMP?`<span style="color:var(--o);font-size:10px"> ↔${s.담당}</span>`:''}
+      </div>
       <div class="search-meta">${s.요일}요일 · ${s.유종||'유종미등록'} ${s.입금자?'· '+s.입금자:''}</div>
     </div>`).join('');
   if(q) html+=`<div class="search-new" onclick="openNewStore('${q}')">➕ "${q}" 신규 추가</div>`;
@@ -1986,6 +1996,11 @@ async function saveNewStore(){
   const 이름=document.getElementById('ns-name').value.trim();
   const 요일=document.getElementById('ns-day').value;
   if(!이름||!요일){showToast('필수 항목을 입력해주세요');return;}
+  // 중복 거래처 방지
+  const existing=stores.find(s=>s.이름===이름);
+  if(existing){
+    if(!confirm(`"${이름}" 거래처가 이미 있어요.\n(담당: ${existing.담당||'미배정'}, ${existing.요일}요일)\n그래도 새로 추가할까요?`))return;
+  }
   const s={코드:'C'+Date.now(),이름,담당:EMP,요일,
     유종:document.getElementById('ns-type').value,
     연락처:document.getElementById('ns-phone').value.trim(),

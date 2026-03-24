@@ -118,6 +118,15 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--t);m
 .toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--g);color:#000;padding:11px 22px;border-radius:100px;font-size:13px;font-weight:700;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;pointer-events:none;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 select option{background:#181c24;}
+.type-search-wrap{position:relative;margin-bottom:10px;}
+.type-search-input{width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--t);font-size:14px;font-family:'Noto Sans KR',sans-serif;outline:none;}
+.type-search-input:focus{border-color:var(--p);}
+.type-dropdown{position:absolute;top:100%;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:10px;z-index:100;max-height:180px;overflow-y:auto;display:none;margin-top:2px;}
+.type-dropdown.show{display:block;}
+.type-opt{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);}
+.type-opt:last-child{border-bottom:none;}
+.type-opt:active,.type-opt:hover{background:var(--card2);}
+.badge.o{background:rgba(255,159,67,.12);color:var(--o);}
 </style>
 </head>
 <body>
@@ -247,6 +256,17 @@ select option{background:#181c24;}
           <div id="store-recent-tx" style="font-size:12px;color:var(--t2)">-</div>
         </div>
       </div>
+      <div id="store-account-box" style="display:none;background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.25);border-radius:10px;padding:10px 14px;margin-top:8px">
+        <div style="font-size:10px;font-weight:700;color:var(--o);margin-bottom:6px">💸 폐유 입금 계좌 (내가 보낼 곳)</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <span style="font-size:11px;color:var(--t2)">계좌</span>
+          <span style="font-size:12px;font-weight:700;color:var(--t)" id="store-account-txt">-</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;color:var(--t2)">예금주</span>
+          <span style="font-size:12px;font-weight:700;color:var(--t)" id="store-payer-txt">-</span>
+        </div>
+      </div>
     </div>
 
     <div class="sec-label">납품 품목</div>
@@ -359,7 +379,8 @@ select option{background:#181c24;}
       <div class="inp-wrap"><label>주 유종 (선택)</label><select class="inp" id="ns-type"><option value="">없음</option></select></div>
     </div>
     <div class="inp-wrap"><label>사장 연락처</label><input class="inp" id="ns-phone" type="tel" placeholder="010-0000-0000"></div>
-    <div class="inp-wrap"><label>입금자명</label><input class="inp" id="ns-payer" type="text" placeholder="통장에 찍히는 이름"></div>
+    <div class="inp-wrap"><label>입금자명</label><input class="inp" id="ns-payer" type="text" placeholder="통장에 찍히는 이름 (폐유거래처: 우리가 입금받을 사람)"></div>
+    <div class="inp-wrap"><label>계좌번호 <span style="color:var(--t3);font-size:10px">(폐유 거래처 - 내가 입금해줄 계좌)</span></label><input class="inp" id="ns-account" type="text" placeholder="은행명 + 계좌번호"></div>
     <div class="inp-wrap"><label>특이사항</label><input class="inp" id="ns-note" type="text"></div>
     <div class="modal-btns">
       <button class="btn-cancel" onclick="closeModal('new-store-modal')">취소</button>
@@ -905,17 +926,22 @@ function addItem(defaultType='',defaultQty=0){
   items.push({id,type:defaultType,qty:defaultQty,price:+defPrice||0});
   const el=document.createElement('div');
   el.className='item-card';el.id=`item-${id}`;
-  const typeOpts=getTypeOptions().map(t=>`<option value="${t}"${t===defaultType?' selected':''}>${t}</option>`).join('');
   el.innerHTML=`
     <div class="item-header">
       <span class="item-badge" id="ib-${id}">${defaultType||'품목 선택'}</span>
       <button class="btn-danger" onclick="removeItem(${id})">✕</button>
     </div>
-    <div class="inp-wrap"><label>품목/유종</label>
-      <select class="inp" id="it-${id}" onchange="onItemChange(${id})"><option value="">선택...</option>${typeOpts}</select>
+    <div class="inp-wrap">
+      <label>품목/유종 검색</label>
+      <div class="type-search-wrap">
+        <input class="type-search-input" id="it-q-${id}" placeholder="유종 검색..." value="${defaultType}" autocomplete="off"
+          oninput="onTypeSearch(${id})" onfocus="onTypeSearch(${id})" onblur="setTimeout(()=>closeTypeDD(${id}),150)">
+        <input type="hidden" id="it-${id}" value="${defaultType}">
+        <div class="type-dropdown" id="it-dd-${id}"></div>
+      </div>
     </div>
     <div class="grid2">
-      <div class="inp-wrap" style="margin:0"><label>통수/수량</label><input class="inp" type="number" id="iq-${id}" value="${defaultQty||''}" placeholder="0" inputmode="numeric" oninput="calcItem(${id})"></div>
+      <div class="inp-wrap" style="margin:0"><label>통수 (반품은 -)</label><input class="inp" type="number" id="iq-${id}" value="${defaultQty||''}" placeholder="0" inputmode="numeric" oninput="calcItem(${id})"></div>
       <div class="inp-wrap" style="margin:0"><label>판매단가 (원)</label><input class="inp" type="number" id="ip-${id}" value="${defPrice}" placeholder="0" inputmode="numeric" oninput="calcItem(${id})"></div>
     </div>
     <div class="item-calc" id="ic-${id}" style="display:none">마진: <span id="im-${id}">-</span></div>`;
@@ -923,6 +949,23 @@ function addItem(defaultType='',defaultQty=0){
   if(defaultType&&defaultQty)calcItem(id);
 }
 function removeItem(id){items=items.filter(i=>i.id!==id);document.getElementById(`item-${id}`)?.remove();calcDelivery();}
+function onTypeSearch(id){
+  const q=(document.getElementById(`it-q-${id}`)?.value||'').trim().toLowerCase();
+  const opts=getTypeOptions().filter(t=>!q||t.toLowerCase().includes(q));
+  const dd=document.getElementById(`it-dd-${id}`);
+  dd.innerHTML=opts.map(t=>`<div class="type-opt" onmousedown="selectType(${id},'${t}')">${t}</div>`).join('')||
+    `<div class="type-opt" style="color:var(--t3)">결과 없음</div>`;
+  dd.classList.add('show');
+}
+function selectType(id,type){
+  document.getElementById(`it-q-${id}`).value=type;
+  document.getElementById(`it-${id}`).value=type;
+  document.getElementById(`it-dd-${id}`).classList.remove('show');
+  onItemChange(id);
+}
+function closeTypeDD(id){
+  document.getElementById(`it-dd-${id}`)?.classList.remove('show');
+}
 function onItemChange(id){
   const type=document.getElementById(`it-${id}`).value;
   document.getElementById(`ib-${id}`).textContent=type||'품목 선택';
@@ -939,9 +982,18 @@ function calcItem(id){
   const item=items.find(i=>i.id===id);
   if(item){item.type=type;item.qty=qty;item.price=price;}
   const calcEl=document.getElementById(`ic-${id}`);
-  if(qty>0&&price>0&&cost>0){
+  const badge=document.getElementById(`ib-${id}`);
+  const isReturn=qty<0;
+  if(badge){
+    badge.textContent=isReturn?`↩️ 반품 ${type||''}`:(type||'품목 선택');
+    badge.style.background=isReturn?'rgba(255,107,107,.12)':'rgba(108,143,255,.1)';
+    badge.style.color=isReturn?'var(--r)':'var(--p)';
+  }
+  if(qty!==0&&price>0&&cost>0){
     calcEl.style.display='block';
-    if(isFeeItem(type,today())){
+    if(isReturn){
+      document.getElementById(`im-${id}`).textContent=`↩️ 반품 ${Math.abs(qty)}통 → 차량재고 복귀, 미수 ${(Math.abs(qty)*price).toLocaleString()}원 차감`;
+    } else if(isFeeItem(type,today())){
       document.getElementById(`im-${id}`).textContent=`수수료 ${cost.toLocaleString()}원/통 × ${qty}통 = ${(qty*cost).toLocaleString()}원 (청구없음)`;
     } else {
       document.getElementById(`im-${id}`).textContent=`${(price-cost).toLocaleString()}원/통 × ${qty}통 = ${(qty*(price-cost)).toLocaleString()}원`;
@@ -1106,9 +1158,19 @@ async function saveDelivery(){
     await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'tx',tx})});
     txList.unshift(tx);
     localStorage.setItem(`tx_${EMP}_v3`,JSON.stringify(txList.slice(0,300)));
+    const returnItems=items.filter(i=>i.qty<0);
+    if(returnItems.length>0){
+      const todayCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
+      returnItems.forEach(ri=>{
+        const ex=todayCargos.find(c=>c.유종===ri.type&&c.거래처===storeName);
+        if(ex)ex.통수=Math.max(0,ex.통수+Math.abs(ri.qty));
+        else todayCargos.push({거래처:'',유종:ri.type,통수:Math.abs(ri.qty),반품이월:true});
+      });
+      localStorage.setItem(`cargo_today_${EMP}`,JSON.stringify(todayCargos));
+    }
     completedRoutes.push(storeName);
     localStorage.setItem(`done_${EMP}_${t}`,JSON.stringify(completedRoutes));
-    showToast('✅ 저장됐어요!');
+    showToast(returnItems.length>0?'↩️ 반품 저장 (차량재고 복귀)':'✅ 저장됐어요!');
     hideDeliveryForm();
     renderRoute();
     renderHistory();
@@ -1214,7 +1276,11 @@ function renderHistory(){
   el.innerHTML=list.map(tx=>`
     <div class="tx-card">
       <div class="tx-top">
-        <div><div class="tx-store">${tx.거래처}</div><span class="badge ${tx.미수?'r':'g'}">${tx.수금방법}</span></div>
+        <div>
+          <div class="tx-store">${tx.거래처}</div>
+          <span class="badge ${tx.수금방법==='반품'?'o':tx.미수?'r':'g'}">${tx.수금방법==='반품'?'↩️ 반품':tx.수금방법}</span>
+          ${tx.통수<0?`<span class="badge o" style="margin-left:4px">반품 ${Math.abs(tx.통수)}통</span>`:''}
+        </div>
         <div style="text-align:right">
           <div class="tx-date">${tx.날짜}</div>
           ${tx.날짜===t?`<button class="btn-danger" style="font-size:10px;padding:4px 8px;margin-top:4px" onclick="deleteTx(${tx.id},'${tx.거래처}')">삭제</button>`:''}
@@ -1237,7 +1303,7 @@ function renderHistory(){
 // ══════════════ 신규 거래처 ══════════════
 function openNewStore(name){
   document.getElementById('ns-name').value=name;
-  ['ns-day','ns-type','ns-phone','ns-payer','ns-note'].forEach(id=>document.getElementById(id).value='');
+  ['ns-day','ns-type','ns-phone','ns-payer','ns-account','ns-note'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('ns-sub').textContent=`"${name}"을(를) 새 거래처로 추가합니다`;
   document.getElementById('new-store-modal').classList.add('show');
 }
@@ -1250,6 +1316,7 @@ async function saveNewStore(){
     유종:document.getElementById('ns-type').value,
     연락처:document.getElementById('ns-phone').value.trim(),
     입금자:document.getElementById('ns-payer').value.trim(),
+    계좌:document.getElementById('ns-account').value.trim(),
     비고:document.getElementById('ns-note').value.trim()};
   stores.push(s);
   localStorage.setItem('stores_v3',JSON.stringify(stores));
@@ -1296,6 +1363,13 @@ async function loadStoreInfo(storeName){
 
     // 미수 있으면 수금방법에 미수차감 추가
     window.curStoreMisu=misu;
+    const storeInfo=stores.find(x=>x.이름===storeName);
+    const acctBox=document.getElementById('store-account-box');
+    if(storeInfo?.계좌){
+      if(acctBox){acctBox.style.display='block';
+        document.getElementById('store-account-txt').textContent=storeInfo.계좌;
+        document.getElementById('store-payer-txt').textContent=storeInfo.입금자||'-';}
+    } else {if(acctBox)acctBox.style.display='none';}
     updatePayButtons();
   }catch(e){
     loading.textContent='조회실패';

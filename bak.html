@@ -319,13 +319,13 @@ select option{background:#181c24;}
         <!-- kg × 단가 방식 -->
         <div id="waste-calc-fields">
           <div class="grid2">
-            <div class="inp-wrap" style="margin:0"><label>실중량 (kg)</label><input class="inp" type="number" id="w-kg" placeholder="0.0" step="0.1" inputmode="decimal" oninput="calcDelivery()"></div>
-            <div class="inp-wrap" style="margin:0"><label>매입단가 (원/kg)</label><input class="inp" type="number" id="w-price" placeholder="0" inputmode="numeric" step="100" oninput="calcDelivery()"></div>
+            <div class="inp-wrap" style="margin:0"><label>실중량 (kg)</label><input class="inp" type="number" id="w-kg" placeholder="0.0" step="0.1" inputmode="decimal" oninput="numOnly(this,true);calcDelivery()"></div>
+            <div class="inp-wrap" style="margin:0"><label>매입단가 (원/kg)</label><input class="inp" type="number" id="w-price" placeholder="0" inputmode="numeric" step="100" oninput="numOnly(this);calcDelivery()"></div>
           </div>
         </div>
         <!-- 금액 직접입력 방식 -->
         <div id="waste-direct-fields" style="display:none">
-          <div class="inp-wrap" style="margin:0"><label>폐유 지급액 (원)</label><input class="inp" type="number" id="w-direct" placeholder="0" inputmode="numeric" step="100" oninput="calcDelivery()"></div>
+          <div class="inp-wrap" style="margin:0"><label>폐유 지급액 (원)</label><input class="inp" type="number" id="w-direct" placeholder="0" inputmode="numeric" step="100" oninput="numOnly(this);calcDelivery()"></div>
         </div>
         <div style="font-size:11px;color:var(--t2);margin-top:8px">※ 수거한 폐유 → 내일 출근탭에서 납품</div>
       </div>
@@ -344,7 +344,7 @@ select option{background:#181c24;}
     <div id="pay-buttons"></div>
     <div class="inp-wrap" id="pay-amount-wrap" style="display:none">
       <label id="pay-amount-label">수금액 (원)</label>
-      <input class="inp" type="number" id="pay-amount" placeholder="0" inputmode="numeric" step="100">
+      <input class="inp" type="number" id="pay-amount" placeholder="0" inputmode="numeric" step="100" oninput="numOnly(this)">
     </div>
     <div class="inp-wrap"><label>비고</label><input class="inp" type="text" id="d-note" placeholder="특이사항"></div>
     <button class="btn-primary" onclick="saveDelivery()">저장</button>
@@ -398,7 +398,7 @@ select option{background:#181c24;}
 
     <div class="card" id="pay-input-card">
       <div class="grid2">
-        <div class="inp-wrap"><label>입금액 *</label><input class="inp" type="number" id="pay-amt" placeholder="0" inputmode="numeric" step="10"></div>
+        <div class="inp-wrap"><label>입금액 *</label><input class="inp" type="number" id="pay-amt" placeholder="0" inputmode="numeric" step="10" oninput="numOnly(this)"></div>
         <div class="inp-wrap"><label>방법</label><select class="inp" id="pay-method"><option>계좌이체</option><option>현금</option></select></div>
       </div>
       <div class="inp-wrap"><label>입금자명</label><input class="inp" type="text" id="pay-payer" placeholder="통장에 찍히는 이름" oninput="onPayerNameInput()"></div>
@@ -718,6 +718,20 @@ async function safeFetch(payload, onSuccess){
   }
 }
 
+// ── 숫자 입력 필터 ──
+function numOnly(el, allowDecimal=false){
+  const v = el.value;
+  const cleaned = allowDecimal
+    ? v.replace(/[^0-9.]/g,'').replace(/(\..*)\./g,'$1')  // 소수점 1개만
+    : v.replace(/[^0-9]/g,'');
+  if(v !== cleaned) el.value = cleaned;
+}
+function numOnlyNeg(el){ // 음수 허용 (통수 반품)
+  const v = el.value;
+  const cleaned = v.replace(/[^0-9-]/g,'').replace(/(?!^)-/g,'');
+  if(v !== cleaned) el.value = cleaned;
+}
+
 function matchQ(target, q){
   if(!q)return true;
   const t=(target||'').replace(/\s/g,'').toLowerCase();
@@ -832,13 +846,13 @@ function addPallet(){
     </div>
     <div id="pe-fields-${id}" style="display:none;margin-bottom:8px">
       <div class="grid2">
-        <div class="inp-wrap" style="margin:0"><label>기존 중량 (kg)</label><input class="inp" type="number" id="p${id}-ek" value="0" inputmode="decimal" oninput="calcPallet(${id})"></div>
-        <div class="inp-wrap" style="margin:0"><label>기존 캔수 (최대 60)</label><input class="inp" type="number" id="p${id}-ec" value="0" inputmode="numeric" max="60" oninput="calcPallet(${id})"></div>
+        <div class="inp-wrap" style="margin:0"><label>기존 중량 (kg)</label><input class="inp" type="number" id="p${id}-ek" value="0" inputmode="decimal" oninput="numOnly(this,true);calcPallet(${id})"></div>
+        <div class="inp-wrap" style="margin:0"><label>기존 캔수 (최대 60)</label><input class="inp" type="number" id="p${id}-ec" value="0" inputmode="numeric" max="60" oninput="numOnly(this);calcPallet(${id})"></div>
       </div>
     </div>
     <div class="grid2">
-      <div class="inp-wrap" style="margin:0"><label>총 중량 (kg) <span style="color:var(--t3);font-size:10px">최대 1800</span></label><input class="inp" type="number" id="p${id}-tk" placeholder="0" inputmode="decimal" max="1800" oninput="calcPallet(${id})"></div>
-      <div class="inp-wrap" style="margin:0"><label id="p${id}-tc-label">내린 캔수 <span style="color:var(--t3);font-size:10px">최대 60</span></label><input class="inp" type="number" id="p${id}-tc" placeholder="0" inputmode="numeric" max="60" oninput="calcPallet(${id})"></div>
+      <div class="inp-wrap" style="margin:0"><label>총 중량 (kg) <span style="color:var(--t3);font-size:10px">최대 1800</span></label><input class="inp" type="number" id="p${id}-tk" placeholder="0" inputmode="decimal" max="1800" oninput="numOnly(this,true);calcPallet(${id})"></div>
+      <div class="inp-wrap" style="margin:0"><label id="p${id}-tc-label">내린 캔수 <span style="color:var(--t3);font-size:10px">최대 60</span></label><input class="inp" type="number" id="p${id}-tc" placeholder="0" inputmode="numeric" max="60" oninput="numOnly(this);calcPallet(${id})"></div>
     </div>
     <div id="p${id}-res" style="display:none;margin-top:8px;background:rgba(61,220,132,.06);border:1px solid rgba(61,220,132,.15);border-radius:8px;padding:10px 12px">
       <div style="display:flex;justify-content:space-between;margin-bottom:4px">
@@ -993,7 +1007,7 @@ function addCargo(){
         </div>
       </div>
       <div class="inp-wrap" style="margin:0"><label>통수 *</label>
-        <input class="inp" type="number" id="cq-${id}" placeholder="0" inputmode="numeric" oninput="calcStockSummary()">
+        <input class="inp" type="number" id="cq-${id}" placeholder="0" inputmode="numeric" oninput="numOnly(this);calcStockSummary()">
       </div>
     </div>`;
   document.getElementById('cargo-list').appendChild(el);
@@ -1442,8 +1456,8 @@ function addItem(defaultType='',defaultQty=0){
       </div>
     </div>
     <div class="grid2">
-      <div class="inp-wrap" style="margin:0"><label>통수 (반품은 -)</label><input class="inp" type="number" id="iq-${id}" value="${defaultQty||''}" placeholder="0" inputmode="numeric" oninput="calcItem(${id})"></div>
-      <div class="inp-wrap" style="margin:0"><label>판매단가 (원)</label><input class="inp" type="number" id="ip-${id}" value="${defPrice}" placeholder="0" inputmode="numeric" step="500" oninput="calcItem(${id})"></div>
+      <div class="inp-wrap" style="margin:0"><label>통수 (반품은 -)</label><input class="inp" type="number" id="iq-${id}" value="${defaultQty||''}" placeholder="0" inputmode="numeric" oninput="numOnlyNeg(this);calcItem(${id})"></div>
+      <div class="inp-wrap" style="margin:0"><label>판매단가 (원)</label><input class="inp" type="number" id="ip-${id}" value="${defPrice}" placeholder="0" inputmode="numeric" step="500" oninput="numOnly(this);calcItem(${id})"></div>
     </div>
     <div class="item-calc" id="ic-${id}" style="display:none">마진: <span id="im-${id}">-</span></div>`;
   document.getElementById('item-list').appendChild(el);

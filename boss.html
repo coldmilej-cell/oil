@@ -1010,7 +1010,7 @@ async function addWastePrice(){
   const 날짜=document.getElementById('nw-date').value;
   if(!단가val||!날짜){showToast('단가와 날짜를 입력해주세요');return;}
   const today=new Date().toISOString().slice(0,10);
-  if(날짜<today){showToast('⚠️ 과거 날짜는 등록 불가');return;}
+  if(날짜<today){showToast('⚠️ 오늘 이전 날짜는 불가 (오늘부터 등록 가능)');return;}
   const wastePrices=allPrices.filter(p=>p.품명==='폐유매입단가').sort((a,b)=>new Date(b.적용일자)-new Date(a.적용일자));
   const curPrice=wastePrices.length>0?(+wastePrices[0].출고가).toLocaleString()+'원/kg':'없음';
   if(!confirm(`폐유 단가 변경\n\n현재: ${curPrice}\n변경: ${(+단가val).toLocaleString()}원/kg\n적용일: ${날짜}부터\n\n정말 저장할까요?`))return;
@@ -1018,10 +1018,11 @@ async function addWastePrice(){
     const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'waste_price',단가:+단가val,날짜})});
     const d=await res.json();
     if(d.ok===false){showToast('⚠️ '+d.error);return;}
-  }catch(e){}
+  }catch(e){showToast('⚠️ 저장 실패: '+e.message);return;}
   showToast('✅ 폐유 단가 변경!');
   document.getElementById('nw-price').value='';
   await loadPrices();
+  renderPrices();
 }
 
 async function addPrice(){

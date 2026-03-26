@@ -674,7 +674,7 @@ async function runAutoAssign(){
     let done=0;
     for(const s of toUpdate){
       const updated={...s, 담당:assign[s.이름]||''};
-      await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({type:'store_update',store:updated})});
       done++;
       btn.textContent=`⏳ 저장 중... (${done}/${toUpdate.length})`;
@@ -818,7 +818,7 @@ async function saveStore(){
   try{
     if(editingStoreCode){
       store.코드=editingStoreCode;
-      const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({type:'store_update',store})});
       const d=await res.json();
       if(d.ok===false){showToast('⚠️ '+d.error);return;}
@@ -829,7 +829,7 @@ async function saveStore(){
         return Math.max(max,n);
       },0);
       store.코드=`C${String(maxCode+1).padStart(3,'0')}`;
-      const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({type:'store_add',store})});
       const d=await res.json();
       if(d.ok===false){showToast('⚠️ '+d.error);return;}
@@ -843,7 +843,7 @@ async function saveStore(){
 async function deleteStore(code,name){
   if(!confirm(`"${name}"\n\n정말 삭제할까요?\n미수금 내역은 남아있습니다.`))return;
   try{
-    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({type:'store_delete',코드:code})});
     const d=await res.json();
     if(d.ok===false){showToast('⚠️ '+d.error);return;}
@@ -965,7 +965,7 @@ async function deleteTx(id){
   if(!confirm('삭제할까요?'))return;
   const month=document.getElementById('hist-month').value;
   const [y,m]=month.split('-');
-  await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},
+  await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({type:'delete_tx',id,year:+y,month:+m})});
   showToast('삭제됐어요');
   await loadHistoryAll();
@@ -1015,7 +1015,7 @@ async function addWastePrice(){
   const curPrice=wastePrices.length>0?(+wastePrices[0].출고가).toLocaleString()+'원/kg':'없음';
   if(!confirm(`폐유 단가 변경\n\n현재: ${curPrice}\n변경: ${(+단가val).toLocaleString()}원/kg\n적용일: ${날짜}부터\n\n정말 저장할까요?`))return;
   try{
-    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'waste_price',단가:+단가val,날짜})});
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'waste_price',단가:+단가val,날짜})});
     const d=await res.json();
     if(d.ok===false){showToast('⚠️ '+d.error);return;}
   }catch(e){showToast('⚠️ 저장 실패: '+e.message);return;}
@@ -1038,7 +1038,7 @@ async function addPrice(){
   const curPrice=latest.length>0?(+latest[0].출고가).toLocaleString()+'원':'없음';
   if(!confirm(`단가 변경\n\n품목: ${품명}\n현재: ${curPrice}\n변경: ${(+출고가val).toLocaleString()}원\n적용일: ${날짜}부터\n\n정말 저장할까요?`))return;
   try{
-    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'price',price:{품명,구분,출고가:+출고가val,날짜,비고:''}})});
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'price',price:{품명,구분,출고가:+출고가val,날짜,비고:''}})});
     const d=await res.json();
     if(d.ok===false){showToast('⚠️ '+d.error);return;}
   }catch(e){}
@@ -1088,8 +1088,8 @@ async function saveEditWaste(){
   const newPrice=parseFloat(document.getElementById('edit-waste-price').value);
   if(!newPrice){showToast('단가를 입력해주세요');return;}
   try{
-    await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'delete_waste_price',날짜:String(p.적용일자).slice(0,10)})});
-    await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'waste_price',단가:newPrice,날짜:String(p.적용일자).slice(0,10)})});
+    await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'delete_waste_price',날짜:String(p.적용일자).slice(0,10)})});
+    await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'waste_price',단가:newPrice,날짜:String(p.적용일자).slice(0,10)})});
     showToast('✅ 단가 수정됐어요!');
     closeEditWaste();
     await loadPrices();
@@ -1101,7 +1101,7 @@ async function deleteWastePrice(){
   if(!confirm('이 단가를 삭제할까요?'))return;
   const p=wastePrices[editWasteIdx];
   try{
-    await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'delete_waste_price',날짜:String(p.적용일자).slice(0,10)})});
+    await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'delete_waste_price',날짜:String(p.적용일자).slice(0,10)})});
     showToast('삭제됐어요');closeEditWaste();await loadPrices();
   }catch(e){showToast('⚠️ 삭제 실패');}
 }
@@ -1193,7 +1193,7 @@ async function runMonthlyClose(){
   try{
     const res=await fetch(API,{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({type:'monthly_close',year:+y,month:+m,직원:emp||null})
     });
     const d=await res.json();
@@ -1313,7 +1313,7 @@ async function saveAccounts(){
   for(let i=0; i<Math.max(accounts.length+1, 10); i++){
     const key = `account_${i+1}`;
     const value = accounts[i] ? JSON.stringify(accounts[i]) : '';
-    await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+    await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({type:'config', key, value, desc:'계좌정보'})});
   }
 }

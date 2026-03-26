@@ -685,7 +685,7 @@ async function flushQueue(){
     try{
       const res = await fetch(API, {
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{'Content-Type':'text/plain'},
         body: JSON.stringify(item._payload)
       });
       const d = await res.json();
@@ -705,7 +705,7 @@ async function safeFetch(payload, onSuccess){
   try{
     const res = await fetch(API, {
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{'Content-Type':'text/plain'},
       body: JSON.stringify(payload)
     });
     const d = await res.json();
@@ -1152,10 +1152,10 @@ async function saveCheckin(){
           기존있음:p.기존있음,기존중량:p.기존중량,기존캔:p.기존캔,내린캔수:p.내린캔수
         }))
       };
-      try{await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'waste_delivery',delivery})});}catch(e){}
+      try{await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'waste_delivery',delivery})});}catch(e){}
     }
     for(const c of validCargos){
-      try{await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+      try{await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({type:'cargo',cargo:{id:Date.now()+Math.random(),날짜:t,직원:EMP,거래처:c.거래처||'',유종:c.유종,통수:c.통수}})});}catch(e){}
     }
     // 상차 로컬 저장 (납품탭 연동)
@@ -1869,7 +1869,7 @@ async function deleteTxByStore(storeName){
   const tx=txs.reduce((a,b)=>a.id>b.id?a:b); // 가장 최근 id
   const now=new Date();
   try{
-    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({type:'delete_tx',id:tx.id,year:now.getFullYear(),month:now.getMonth()+1})});
     const d=await res.json();
     if(d.ok===false){showToast('⚠️ '+d.error);return;}
@@ -1886,7 +1886,7 @@ async function deleteTx(id,storeName=''){
   if(!confirm(`${storeName||'이 납품'}을 삭제할까요?`))return;
   const now=new Date();
   try{
-    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
       body:JSON.stringify({type:'delete_tx',id,year:now.getFullYear(),month:now.getMonth()+1})});
     const d=await res.json();
     if(d.ok===false){showToast('⚠️ '+d.error);return;}
@@ -2228,7 +2228,7 @@ async function aiMatchExcelRows(){
       const rowsText=needAI.map(r=>`${r.idx}. ${r.입금자} ${r.금액.toLocaleString()}원`).join('\n');
       const res=await fetch('https://api.anthropic.com/v1/messages',{
         method:'POST',
-        headers:{'Content-Type':'application/json'},
+        headers:{'Content-Type':'text/plain'},
         body:JSON.stringify({
           model:'claude-sonnet-4-20250514',
           max_tokens:800,

@@ -744,7 +744,7 @@ async function init(){
   document.getElementById('ci-date').textContent=`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} (${DAYS[now.getDay()]})`;
   document.getElementById('delivery-day-label').textContent=`${DAYS[now.getDay()]}요일 루트`;
   const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  document.getElementById('hist-month-label').textContent=ym;
+  const hml=document.getElementById('hist-month-label'); if(hml) hml.textContent=ym;
 
   try{
     const fetchOpts={signal:AbortSignal.timeout?AbortSignal.timeout(8000):undefined};

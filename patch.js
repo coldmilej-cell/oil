@@ -324,3 +324,189 @@ async function batchCopyReceipts(){
   const dateEl=document.getElementById('hist-date-sel');
   await batchCopyReceiptsByDate(dateEl?.value||today());
 }
+
+
+// ══════════════ 차량재고 서버 동기화 ══════════════
+
+async function syncCargoToServer(){
+  const t = today();
+  const cargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
+  try{
+    await fetch(API, {
+      method: 'POST',
+      headers: {'Content-Type':'text/plain'},
+      body: JSON.stringify({type:'cargo_sync', emp:EMP, date:t, cargos})
+    });
+  }catch(e){} // 동기화 실패해도 로컬은 정상
+}
+
+async function loadCargoFromServer(){
+  const t = today();
+  try{
+    const res = await fetch(`${API}?type=cargo_today&emp=${encodeURIComponent(EMP)}&date=${t}`);
+    const d = await res.json();
+    if(d.cargos && d.cargos.length > 0){
+      // 로컬에 없는 경우만 서버 데이터 사용 (로컬 우선)
+      const local = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
+      if(!local.length){
+        localStorage.setItem(`cargo_today_${EMP}`, JSON.stringify(d.cargos));
+        showToast('📦 서버에서 상차 데이터 복원됐어요');
+        renderRoute();
+      }
+    }
+  }catch(e){}
+}
+
+// saveCheckin 오버라이드 - 서버 동기화 추가
+const _origSaveCheckin = typeof saveCheckin === 'function' ? saveCheckin : null;
+
+async function saveCheckin(){
+  const validPallets = pallets.filter(p=>p.총중량>0&&p.캔수>0);
+  const validCargos  = cargos.filter(c=>c.통수>0);
+  if(!validPallets.length&&!validCargos.length){showToast('폐유납품 또는 상차를 입력해주세요');return;}
+
+  const wcp = getWastePriceAt(today());
+  const totalReal = validPallets.reduce((s,p)=>s+p.실중량,0);
+  const income = Math.round(totalReal*wcp);
+  const t = today();
+
+  try{
+    // 폐유납품 저장 (수거처목록 포함)
+    if(validPallets.length>0){
+      const hasExistPallet=validPallets.some(p=>p.기존있음);
+      const existPallet=validPallets.find(p=>p.기존있음);
+      const delivery={
+        id:Date.now(),날짜:t,직원:EMP,
+        파레트수:validPallets.length,총실중량:totalReal,매입단가:wcp,폐유수입:income,
+        이전계근여부:hasExistPallet,
+        기존중량:existPallet?.기존중량||0,기존캔수:existPallet?.기존캔||0,
+        내린캔수:validPallets.reduce((s,p)=>s+(p.내린캔수||p.캔수||0),0),
+        파레트목록:validPallets.map(p=>({총중량:p.총중량,캔수:p.캔수,실중량:p.실중량,기존있음:p.기존있음,기존중량:p.기존중량,기존캔:p.기존캔,내린캔수:p.내린캔수})),
+        수거처목록:[] // 출근탭에서는 거래처 연결 없음 (납품탭에서 폐유 수거 시 연결)
+      };
+      try{await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'waste_delivery',delivery})});}catch(e){}
+    }
+
+    // 상차 저장
+    for(const c of validCargos){
+      try{await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({type:'cargo',cargo:{id:Date.now()+Math.random(),날짜:t,직원:EMP,거래처:c.거래처||'',유종:c.유종,통수:c.통수}})});}catch(e){}
+    }
+
+    // 로컬 저장
+    const savedCargos=validCargos.map(c=>({거래처:c.거래처,유종:c.유종,통수:c.통수}));
+    const prevCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
+    const mergedCargos=[...prevCargos];
+    savedCargos.forEach(nc=>{
+      const ex=mergedCargos.find(x=>x.거래처===nc.거래처&&x.유종===nc.유종);
+      if(ex)ex.통수+=nc.통수; else mergedCargos.push({...nc});
+    });
+    localStorage.setItem(`cargo_today_${EMP}`,JSON.stringify(mergedCargos));
+
+    // 출근 로그
+    const log=JSON.parse(localStorage.getItem(`checkin_log_${EMP}_${t}`)||'[]');
+    log.push({id:Date.now(),폐유:{파레트수:validPallets.length,실중량:totalReal,수입:income},상차:savedCargos});
+    localStorage.setItem(`checkin_log_${EMP}_${t}`,JSON.stringify(log));
+
+    // ★ 서버 동기화
+    await syncCargoToServer();
+
+    showToast('✅ 저장됐어요!');
+    pallets=[];cargos=[];palletId=0;cargoId=0;
+    document.getElementById('pallet-list').innerHTML='';
+    document.getElementById('cargo-list').innerHTML='';
+    document.getElementById('waste-total-box').style.display='none';
+    document.getElementById('stock-summary').style.display='none';
+    const sb=document.getElementById('checkin-summary-bar');if(sb)sb.style.display='none';
+    renderCheckinHistory();
+    renderRoute();
+  }catch(e){showToast('⚠️ 저장 실패');}
+}
+
+// ══════════════ 미수 한도 경고 (납품 저장 전) ══════════════
+
+async function checkMisuBeforeSave(storeName, charge){
+  if(!storeName || !charge || charge <= 0) return true; // 체크 불필요
+
+  try{
+    const now = new Date();
+    const res = await fetch(`${API}?type=misu_check&store=${encodeURIComponent(storeName)}&charge=${charge}&year=${now.getFullYear()}&month=${now.getMonth()+1}`);
+    const d = await res.json();
+
+    // 거래처 비활성
+    if(d.ok === false && !d.warn){
+      showToast('⚠️ ' + d.error);
+      return false;
+    }
+
+    // 한도 초과 경고 (warn=true면 경고만, 강제차단 아님)
+    if(d.warn){
+      const proceed = confirm(
+        `⚠️ 미수 한도 초과
+
+거래처: ${storeName}
+현재 미수: ${(d.현재미수||0).toLocaleString()}원
+이번 청구: ${charge.toLocaleString()}원
+한도: ${(d.한도||0).toLocaleString()}원
+
+그래도 납품하시겠어요?`
+      );
+      return proceed;
+    }
+
+    return true; // 정상
+  }catch(e){
+    return true; // 체크 실패해도 납품은 허용
+  }
+}
+
+// ══════════════ init 오버라이드 - 서버 복원 추가 ══════════════
+
+const _origInitPatch = typeof init === 'function' ? init : null;
+
+async function init(){
+  const now=new Date();
+  document.getElementById('ci-date').textContent=`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} (${['일','월','화','수','목','금','토'][now.getDay()]})`;
+  document.getElementById('delivery-day-label').textContent=`${['일','월','화','수','목','금','토'][now.getDay()]}요일 루트`;
+
+  try{
+    const fetchOpts={signal:AbortSignal.timeout?AbortSignal.timeout(8000):undefined};
+    const [sr,pr]=await Promise.all([fetch(API+'?type=stores',fetchOpts),fetch(API+'?type=prices',fetchOpts)]);
+    const sd=await sr.json(),pd=await pr.json();
+    let cd={config:{}};
+    try{const cr=await fetch(API+'?type=config',fetchOpts);cd=await cr.json();}catch(e){}
+
+    if(sd.stores?.length){
+      // 활성 거래처만 로컬 캐시 (비활성은 직원앱에서 제외)
+      stores=sd.stores
+        .filter(s=>s.상태!=='비활성') // 비활성 제외
+        .map(s=>({코드:s.코드||'',이름:s.이름||'',담당:s.담당||'',요일:s.요일||'',유종:s.유종||'',연락처:s.연락처||'',입금자:s.입금자||'',계좌:s.계좌||'',비고:s.비고||'',미수한도:+s.미수한도||0}));
+      localStorage.setItem('stores_v3',JSON.stringify(stores));
+    }
+
+    if(pd.prices?.length){
+      const normalizeDate=d=>{const s=String(d||'');if(s.includes('T'))return s.slice(0,10);return s.slice(0,10);};
+      priceHistory=pd.prices.filter(p=>p.품명&&p.품명!=='폐유매입단가').map(p=>({품명:p.품명,출고가:+p.출고가,날짜:normalizeDate(p.적용일자),구분:p.구분||'범용',비고:p.비고||''}));
+      wastePriceHistory=pd.prices.filter(p=>p.품명==='폐유매입단가').map(p=>({단가:+p.출고가,날짜:normalizeDate(p.적용일자)}));
+      localStorage.setItem('priceHistory_v3',JSON.stringify(priceHistory));
+      localStorage.setItem('wastePriceHistory_v3',JSON.stringify(wastePriceHistory));
+    }
+
+    document.getElementById('sync-status').textContent='✅';
+
+    if(cd.config){let i=1;accounts=[];while(cd.config[`account_${i}`]){try{accounts.push(JSON.parse(cd.config[`account_${i}`]));}catch(e){}i++;}}
+  }catch(e){
+    document.getElementById('sync-status').textContent='📴';
+    document.getElementById('sync-status').style.cursor='pointer';
+    document.getElementById('sync-status').onclick=()=>init();
+  }
+
+  buildNsTypeOptions();buildPayStore();renderCarryOver();renderRoute();renderCheckinHistory();renderTodayPayments();renderHistory();
+  updateQueueBadge();
+
+  // 서버 상차 복원 (로컬이 비어있을 때)
+  setTimeout(()=>{
+    flushQueue();
+    loadCargoFromServer(); // 폰 교체/캐시 삭제 후 복원
+  }, 3000);
+}

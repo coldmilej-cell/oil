@@ -746,3 +746,124 @@ async function loadPrices(){
   // 항상 renderPrices 실행 (데이터 없어도 빈 화면 보여줌)
   renderPrices();
 }
+
+// ══════════════ updateWastePrice 오버라이드 - 수정 후 renderPrices 연동 ══════════════
+async function updateWastePrice(){
+  const 단가val = document.getElementById('edit-waste-price')?.value;
+  if(!단가val){ showToast('단가를 입력해주세요'); return; }
+
+  // 현재 단가의 날짜 가져오기 (모달에 표시된 적용일)
+  const dateEl = document.getElementById('edit-waste-date');
+  const 날짜 = dateEl?.textContent?.trim() || dateEl?.value?.trim() || '';
+
+  if(!confirm(`폐유 단가를 ${(+단가val).toLocaleString()}원/kg으로 수정할까요?`)) return;
+
+  try{
+    // 기존 삭제 후 새로 추가 (날짜 수정 불가 정책)
+    if(날짜){
+      await fetch(API, {method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({type:'delete_waste_price', 날짜})});
+    }
+    const res = await fetch(API, {method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({type:'waste_price', 단가:+단가val, 날짜: 날짜 || new Date().toISOString().slice(0,10)})});
+    const d = await res.json();
+    if(d.ok === false){ showToast('⚠️ '+d.error); return; }
+  }catch(e){ showToast('⚠️ 저장 실패'); return; }
+
+  showToast('✅ 단가 수정됐어요!');
+  document.getElementById('waste-edit-modal')?.classList.remove('show');
+  document.getElementById('waste-edit-modal')?.remove();
+  await loadPrices();
+  renderPrices();
+}
+
+// ══════════════ renderPrices 재오버라이드 - 이전단가 수정버튼 제거, 오늘것만 수정가능 ══════════════
+function renderPrices(){
+  const prices = (typeof allPrices !== 'undefined' ? allPrices : []).map(p => ({
+    ...p,
+    적용일자: normalizeDate(p.적용일자)
+  }));
+
+  const today = new Date().toISOString().slice(0,10);
+
+  // 폐유 단가 — 최신 2개만 표시, 오늘것만 수정 가능
+  const wastePrices = prices
+    .filter(p => p.품명 === '폐유매입단가')
+    .sort((a,b) => b.적용일자.localeCompare(a.적용일자));
+
+  const curEl   = document.getElementById('waste-cur');
+  const curDate = document.getElementById('waste-cur-date');
+  const prevRow = document.getElementById('waste-prev-row');
+  const prevEl  = document.getElementById('waste-prev');
+  const prevDate= document.getElementById('waste-prev-date');
+
+  // 수정 버튼 — 오늘 것만 활성화
+  const editBtn = document.querySelector('[onclick*="openWasteEdit"], [onclick*="waste-edit"]');
+
+  if(wastePrices.length > 0){
+    const cur = wastePrices[0];
+    const val = parseFloat(cur.출고가);
+    if(curEl)   curEl.textContent   = isNaN(val) ? '-' : val.toLocaleString() + '원/kg';
+    if(curDate) curDate.textContent = cur.적용일자 + ' 부터';
+
+    // 수정 버튼 오늘 것만 활성화
+    const isToday = cur.적용일자 === today;
+    const wrapBtn = document.getElementById('waste-edit-btn');
+    if(wrapBtn){
+      wrapBtn.style.opacity = isToday ? '1' : '0.3';
+      wrapBtn.style.pointerEvents = isToday ? 'auto' : 'none';
+      wrapBtn.title = isToday ? '오늘 단가 수정' : '오늘 등록된 단가만 수정 가능';
+    }
+
+    // 이전 단가 — 수정버튼 없이 참고용만 표시
+    if(wastePrices.length > 1){
+      const prev = wastePrices[1];
+      const prevVal = parseFloat(prev.출고가);
+      if(prevRow)  prevRow.style.display = 'flex';
+      if(prevEl)   prevEl.textContent   = isNaN(prevVal) ? '-' : prevVal.toLocaleString() + '원/kg';
+      if(prevDate) prevDate.textContent = prev.적용일자 + ' 부터';
+      // 이전 단가 수정 버튼 숨기기
+      const prevEditBtn = document.getElementById('waste-prev-edit-btn');
+      if(prevEditBtn) prevEditBtn.style.display = 'none';
+    } else {
+      if(prevRow) prevRow.style.display = 'none';
+    }
+  } else {
+    if(curEl)   curEl.textContent   = '-';
+    if(curDate) curDate.textContent = '등록된 단가 없음';
+    if(prevRow) prevRow.style.display = 'none';
+  }
+
+  // 식용유 단가 목록
+  const el = document.getElementById('price-list');
+  if(!el) return;
+
+  const latest = {};
+  prices.filter(p => p.품명 && p.품명 !== '폐유매입단가').forEach(p => {
+    if(!latest[p.품명] || p.적용일자 > latest[p.품명].적용일자) latest[p.품명] = p;
+  });
+
+  const items = Object.values(latest).sort((a,b) => a.품명.localeCompare(b.품명,'ko'));
+
+  if(!items.length){
+    el.innerHTML = '<div class="empty"><div class="empty-icon">💰</div><div style="font-size:13px">단가 없음</div></div>';
+    return;
+  }
+
+  el.innerHTML = items.map(p => {
+    const val = parseFloat(p.출고가);
+    const displayVal = isNaN(val) ? '-' : val.toLocaleString() + '원';
+    const cat = p.구분 || '';
+    const tagMap = {'수수료':'price-tag 수수료','범용':'price-tag 범용','전용':'price-tag 전용','식자재':'price-tag 식자재'};
+    const tagCls = tagMap[cat] || 'price-tag 범용';
+    return `
+    <div class="price-item">
+      <div>
+        <div class="price-name">${p.품명} ${cat?`<span class="${tagCls}">${cat}</span>`:''}
+        </div>
+        <div class="price-meta">${p.적용일자} 기준</div>
+      </div>
+      <div class="price-val">${displayVal}</div>
+    </div>`;
+  }).join('');
+}

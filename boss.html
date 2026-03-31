@@ -102,7 +102,7 @@ select option{background:#161b22;}
 .store-badge.none{background:var(--card2);color:var(--t3);}
 .store-badge.day{background:rgba(63,185,80,.08);color:var(--g);}
 .store-badge.misu{background:rgba(248,81,73,.1);color:var(--r);}
-.filter-row{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;}
+.filter-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;}
 .filter-btn{padding:7px 13px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--t3);white-space:nowrap;font-family:'Noto Sans KR',sans-serif;}
 .filter-btn.on{background:rgba(240,165,0,.1);color:var(--y);border-color:var(--y);}
 .search-wrap{position:relative;margin-bottom:10px;}
@@ -354,13 +354,13 @@ select option{background:#161b22;}
   </div>
 
   <!-- 필터 -->
-  <div class="filter-row">
-    <button class="filter-btn on" onclick="setStoreFilter('전체')">전체</button>
-    <button class="filter-btn" onclick="setStoreFilter('손호영')">손호영</button>
-    <button class="filter-btn" onclick="setStoreFilter('박기빈')">박기빈</button>
-    <button class="filter-btn" onclick="setStoreFilter('공유')">공유</button>
-    <button class="filter-btn" onclick="setStoreFilter('미배정')">미배정</button>
-    <button class="filter-btn" onclick="setStoreFilter('미수')">미수있음</button>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">
+    <button class="filter-btn on" onclick="setStoreFilter('전체')" id="fbtn-전체">전체</button>
+    <button class="filter-btn" onclick="setStoreFilter('손호영')" id="fbtn-손호영">손호영</button>
+    <button class="filter-btn" onclick="setStoreFilter('박기빈')" id="fbtn-박기빈">박기빈</button>
+    <button class="filter-btn" onclick="setStoreFilter('미배정')" id="fbtn-미배정">미배정</button>
+    <button class="filter-btn" onclick="setStoreFilter('미수')" id="fbtn-미수">미수있음</button>
+    <button class="filter-btn" onclick="setStoreFilter('비활성')" id="fbtn-비활성">비활성</button>
   </div>
 
   <div id="store-count" style="font-size:11px;color:var(--t3);margin-bottom:10px"></div>
@@ -769,9 +769,11 @@ async function runAutoAssign(){
 function setStoreFilter(f){
   storeFilter=f;
   document.querySelectorAll('.filter-btn').forEach(b=>{
-    const label=b.textContent.replace('미수있음','미수');
-    b.classList.toggle('on', label===f||b.textContent===f);
+    b.classList.remove('on');
   });
+  const activeBtn = document.getElementById('fbtn-'+f) || 
+    document.querySelector(`.filter-btn[onclick*="'${f}'"]`);
+  if(activeBtn) activeBtn.classList.add('on');
   renderStores();
 }
 
@@ -786,6 +788,10 @@ function renderStores(){
   else if(storeFilter==='공유') list=list.filter(s=>s.담당==='공유');
   else if(storeFilter==='미배정') list=list.filter(s=>!s.담당||s.담당==='');
   else if(storeFilter==='미수') list=list.filter(s=>(misuMap[s.이름]||0)>0);
+  else if(storeFilter==='비활성') list=list.filter(s=>s.상태==='비활성');
+
+  // 기본(전체)이면 비활성 제외
+  if(storeFilter==='전체'||!storeFilter) list=list.filter(s=>s.상태!=='비활성');
 
   list.sort((a,b)=>{
     const am=misuMap[a.이름]||0, bm=misuMap[b.이름]||0;
@@ -817,7 +823,7 @@ function renderStores(){
         </div>`
       : '';
 
-    return `<div class="store-card">
+    return `<div class="store-card" style="${s.상태==='비활성'?'opacity:.5;border-style:dashed;':''}">  
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="flex:1">
           <div class="store-name">${s.이름||''}</div>
@@ -831,8 +837,12 @@ function renderStores(){
           ${cntBar}
           ${s.비고?`<div style="font-size:11px;color:var(--t3);margin-top:5px">📌 ${s.비고}</div>`:''}
         </div>
-        <div style="display:flex;gap:5px;margin-left:8px">
+        <div style="display:flex;gap:5px;margin-left:8px;flex-direction:column;">
           <button class="btn-edit" onclick="openStoreEdit('${s.코드}')">수정</button>
+          ${s.상태==='비활성'
+            ? `<button onclick="toggleStoreActive('${s.코드}','활성')" style="padding:5px 8px;background:rgba(61,220,132,.1);border:1px solid var(--g);border-radius:7px;color:var(--g);font-size:10px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;">활성화</button>`
+            : `<button onclick="toggleStoreActive('${s.코드}','비활성')" style="padding:5px 8px;background:rgba(255,107,107,.1);border:1px solid var(--r);border-radius:7px;color:var(--r);font-size:10px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;">비활성</button>`
+          }
         </div>
       </div>
     </div>`;
@@ -1907,6 +1917,28 @@ setTimeout(()=>{
     const sub=document.getElementById('bspl-sub');
     if(sub)sub.textContent='연결이 오래 걸리고 있어요';
   }
-},10000);</script>
+},10000);
+async function toggleStoreActive(코드, 상태){
+  const s = allStores.find(x=>x.코드===코드);
+  if(!s) return;
+  const msg = 상태==='비활성' ? `"${s.이름}" 비활성 처리할까요?` : `"${s.이름}" 다시 활성화할까요?`;
+  if(!confirm(msg)) return;
+
+  s.상태 = 상태;
+  try{
+    await fetch(API, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({
+        type: 상태==='비활성' ? 'store_deactivate' : 'store_activate',
+        코드, 이름: s.이름
+      })
+    });
+    showToast(상태==='비활성' ? '비활성 처리됨' : '활성화됨');
+  }catch(e){
+    showToast('⚠️ 서버 저장 실패 - 로컬에만 반영');
+  }
+  renderStores();
+}
+</script>
 </body>
 </html>

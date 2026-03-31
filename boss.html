@@ -1762,6 +1762,19 @@ function selectDispatchStore(name, isExisting){
   if(badge) badge.style.display = isExisting ? 'none' : 'inline-block';
 }
 
+
+function selectDispatchEmp(name){
+  document.getElementById('dispatch-emp').value = name;
+  ['손호영','박기빈'].forEach(n => {
+    const btn = document.getElementById('dbtn-' + n);
+    if(!btn) return;
+    const on = n === name;
+    btn.style.borderColor = on ? 'var(--p)' : 'var(--border)';
+    btn.style.background  = on ? 'rgba(108,143,255,.1)' : 'var(--card2)';
+    btn.style.color       = on ? 'var(--p)' : 'var(--t2)';
+  });
+}
+
 async function addDispatch(){
   const storeName = document.getElementById('dispatch-store-q')?.value?.trim();
   const empName = document.getElementById('dispatch-emp')?.value;

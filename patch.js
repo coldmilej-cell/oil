@@ -513,3 +513,204 @@ async function init(){
     loadCargoFromServer(); // 폰 교체/캐시 삭제 후 복원
   }, 3000);
 }
+
+
+// ── renderRoute 오버라이드 (프로그레스바 + 방문일) ──
+function getLastVisit(storeName){
+  const list = (typeof txList !== 'undefined' ? txList : [])
+    .filter(x => x.거래처 === storeName && x.날짜)
+    .sort((a, b) => b.날짜.localeCompare(a.날짜));
+  if(!list.length) return null;
+  const diff = Math.floor((new Date(today()) - new Date(list[0].날짜)) / 86400000);
+  if(diff === 0) return {label:'오늘', color:'var(--g)'};
+  if(diff === 1) return {label:'어제', color:'var(--p)'};
+  if(diff <= 7)  return {label:`${diff}일 전`, color:'var(--t2)'};
+  if(diff <= 30) return {label:`${diff}일 전`, color:'var(--y)'};
+  return {label:`${diff}일 전`, color:'var(--r)'};
+}
+
+function renderRouteProgress(done, total){
+  const prog = document.getElementById('route-progress');
+  if(!prog) return;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const allDone = done === total && total > 0;
+  prog.innerHTML = `
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="font-size:12px;font-weight:700;color:${allDone?'var(--g)':'var(--t2)'};white-space:nowrap">
+        ${allDone ? '✅ 완료' : `${done}/${total}`}
+      </div>
+      <div style="width:72px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${allDone?'var(--g)':'var(--p)'};border-radius:3px;transition:width .4s ease"></div>
+      </div>
+      <div style="font-size:10px;color:var(--t3)">${pct}%</div>
+    </div>`;
+}
+
+const _origRenderRoute = typeof renderRoute === 'function' ? renderRoute : null;
+
+function renderRoute(){
+  const list = getRouteList();
+  const el = document.getElementById('route-list');
+  const prog = document.getElementById('route-progress');
+  if(!list.length){
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📍</div><div>루트 없음<br><span style="font-size:10px">출근탭에서 상차를 입력하거나<br>거래처 요일을 등록해주세요</span></div></div>';
+    if(prog) prog.innerHTML = '';
+    return;
+  }
+  updateDailyBar();
+  const savedCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
+  const doneCount = completedRoutes.filter(n => list.includes(n)).length;
+  renderRouteProgress(doneCount, list.length);
+  el.innerHTML = list.map((name, i) => {
+    const done = completedRoutes.includes(name);
+    const s = stores.find(x => x.이름 === name);
+    const cargo = savedCargos.find(c => c.거래처 === name);
+    const isMine = !s?.담당 || s?.담당 === EMP;
+    const meta = cargo ? `📦 ${cargo.유종} ${cargo.통수}통 상차` : (s?.유종 || '유종미등록');
+    const crossLabel = !isMine && s?.담당 ? `<span style="font-size:9px;color:var(--o);margin-left:4px">↔ ${s.담당}</span>` : '';
+    const visit = getLastVisit(name);
+    const visitBadge = visit
+      ? `<span style="font-size:9px;font-weight:600;color:${visit.color};background:rgba(0,0,0,.2);padding:2px 6px;border-radius:10px;margin-left:4px">${visit.label}</span>`
+      : '';
+    return `<div class="route-item ${done ? 'done' : ''}" id="ri-${i}" data-name="${name}">
+      <div class="route-order" style="background:${done ? 'var(--g)' : 'var(--p2)'};flex-shrink:0">${done ? '✓' : i+1}</div>
+      <div class="route-info" onclick="openDelivery('${name}')">
+        <div class="route-name">${name}${crossLabel}${visitBadge}</div>
+        <div class="route-meta" style="color:${cargo ? 'var(--o)' : 'var(--t2)'}">${meta}</div>
+      </div>
+      ${done
+        ? `<button onclick="deleteTxByStore('${name}')" style="padding:6px 10px;background:rgba(255,107,107,.12);border:none;border-radius:8px;color:var(--r);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">납품삭제</button>`
+        : `<button onclick="removeFromRoute('${name}')" style="padding:6px 10px;background:rgba(122,127,148,.12);border:none;border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">✕</button>`
+      }
+      <div class="drag-handle" draggable="true"
+        ondragstart="dragStart(event,'${name}')"
+        ondragover="dragOver(event)"
+        ondrop="dragDrop(event,'${name}')"
+        ondragend="dragEnd(event)">⠿</div>
+    </div>`;
+  }).join('');
+}
+
+// ── saveDelivery 오버라이드 (완료 애니메이션) ──
+const _origSaveDelivery = typeof saveDelivery === 'function' ? saveDelivery : null;
+
+async function saveDelivery(){
+  if(!curStore && !document.getElementById('chip-name').textContent){ showToast('거래처를 선택해주세요'); return; }
+  if(items.length === 0 && !wasteOn){ showToast('품목 또는 폐유를 입력해주세요'); return; }
+  if(!curPay){ showToast('수금방법을 선택해주세요'); return; }
+
+  const t = today();
+  const storeName = curStore?.이름 || document.getElementById('chip-name').textContent || '임시거래처';
+  const oilTotal = items.reduce((s, i) => isFeeItem(i.type, t) ? s : s + i.qty * i.price, 0);
+  const oilMargin = items.reduce((s, i) => {
+    if(isFeeItem(i.type, t)) return s + i.qty * (getPriceAt(i.type, t) || 0);
+    return s + i.qty * (i.price - (getPriceAt(i.type, t) || 0));
+  }, 0);
+
+  let wasteKg = 0, wastePriceVal = 0, wastePay = 0, wasteRev = 0;
+  if(wasteOn){
+    if(wasteModeCalc){
+      wasteKg = parseFloat(document.getElementById('w-kg')?.value) || 0;
+      wastePriceVal = parseFloat(document.getElementById('w-price')?.value) || 0;
+      wastePay = Math.round(wasteKg * wastePriceVal);
+    } else {
+      wastePay = parseFloat(document.getElementById('w-direct')?.value) || 0;
+    }
+    const wcp2 = getWastePriceAt(t);
+    wasteRev = wasteModeCalc ? Math.round(wasteKg * (wcp2 - wastePriceVal)) : 0;
+  }
+
+  const charge = oilTotal - wastePay;
+  const payAmt = parseFloat(document.getElementById('pay-amount')?.value) || 0;
+
+  const tx = {
+    id: `${t}_${EMP}_${storeName}_${Date.now()}`,
+    날짜: t,
+    시간: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}),
+    직원: EMP, 거래처: storeName,
+    유종: items.map(i => i.type).filter(Boolean).join('/'),
+    품목상세: JSON.stringify(items.map(i => ({type:i.type, qty:i.qty, price:i.price}))),
+    통수: items.reduce((s, i) => s + i.qty, 0),
+    판매단가: items.length === 1 ? items[0].price : 0,
+    출고가: items.length === 1 ? (getPriceAt(items[0].type, t) || 0) : 0,
+    폐유kg: wasteKg, 폐유매입단가: wastePriceVal,
+    식유금액: oilTotal, 폐유매입금: wastePay, 차감청구: charge,
+    식유마진: oilMargin, 폐유수익: wasteRev, 총수익: oilMargin + wasteRev,
+    수금방법: curPay, 수금액: payAmt,
+    미수: curPay === '미수' || curPay === '반품',
+    비고: document.getElementById('d-note')?.value || ''
+  };
+
+  // 로컬 먼저 저장
+  txList.unshift(tx);
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
+  localStorage.setItem(`tx_${EMP}_v3`, JSON.stringify(txList.filter(x => x.날짜 >= cutoff.toISOString().slice(0,10)).slice(0, 500)));
+
+  // 반품 시 차량재고 복귀
+  const returnItems = items.filter(i => i.qty < 0);
+  if(returnItems.length > 0){
+    const todayCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
+    returnItems.forEach(ri => {
+      const ex = todayCargos.find(c => c.유종 === ri.type && c.거래처 === storeName);
+      if(ex) ex.통수 = Math.max(0, ex.통수 + Math.abs(ri.qty));
+      else todayCargos.push({거래처:'', 유종:ri.type, 통수:Math.abs(ri.qty), 반품이월:true});
+    });
+    localStorage.setItem(`cargo_today_${EMP}`, JSON.stringify(todayCargos));
+  }
+
+  if(!completedRoutes.includes(storeName)) completedRoutes.push(storeName);
+  localStorage.setItem(`done_${EMP}_${t}`, JSON.stringify(completedRoutes));
+
+  // 현금/폐유 자동 입금 기록
+  if(curPay === '현금지급' || curPay === '이체지급' || curPay === '미수차감폐유'){
+    const payAmt2 = wastePay || Math.abs(charge);
+    if(payAmt2 > 0){
+      await savePayment({거래처:storeName, 금액:-payAmt2, 날짜:t, 입금자명:'폐유대금', 방법:curPay==='이체지급'?'계좌이체':'현금지급', 비고:'폐유수거 대금 지급'});
+    }
+  }
+  if(curPay === '현금' && payAmt > 0){
+    await savePayment({거래처:storeName, 금액:payAmt, 날짜:t, 입금자명:curStore?.입금자||storeName, 방법:'현금', 비고:'현장 현금수령'});
+  }
+
+  // 서버 전송
+  await safeFetch({type:'tx', tx}, () => {
+    const isReturn = returnItems.length > 0;
+    if(!isReturn) showDeliverySuccess(storeName);
+    else showToast('↩️ 반품 저장 (차량재고 복구)');
+    hideDeliveryForm();
+    renderRoute();
+    renderHistory();
+    updateDailyBar();
+    showReceiptButton(tx);
+  });
+}
+
+// ══════════════ DOM 보완 - son/bak.html HTML에 없는 엘리먼트 동적 생성 ══════════════
+(function fixEmpDOMIssues(){
+  const fix = () => {
+    // hist-month-label이 없으면 내역탭 헤더에 동적 추가
+    if(!document.getElementById('hist-month-label')){
+      const hdr = document.querySelector('#page-history .page-hdr > div');
+      if(hdr){
+        const lbl = document.createElement('div');
+        lbl.id = 'hist-month-label';
+        lbl.style.cssText = 'font-size:11px;color:var(--t3)';
+        hdr.appendChild(lbl);
+        // 값 채우기
+        const now = new Date();
+        lbl.textContent = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      }
+    }
+    // price-search input 숨기기
+    const priceSearch = document.getElementById('price-search');
+    if(priceSearch){
+      const wrap = priceSearch.closest('.inp-wrap');
+      if(wrap) wrap.style.display = 'none';
+    }
+  };
+  if(document.readyState === 'complete' || document.readyState === 'interactive'){
+    setTimeout(fix, 50);
+  } else {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(fix, 50));
+  }
+})();

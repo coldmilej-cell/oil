@@ -235,21 +235,10 @@ select option{background:#161b22;}
   </div>
 </div>
 
-<!-- 내역 -->
+<!-- ★ 수정 2: 내역탭 - 서브탭 제거, boss_patch.js가 채움 -->
 <div class="page" id="page-history">
-  <div class="page-title">📋 전체 내역</div>
-  <div class="month-row" style="margin-bottom:10px">
-    <input type="month" id="hist-month" onchange="loadHistoryAll()" style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;">
-    <select id="hist-emp" onchange="loadHistoryAll()" style="flex:0.7;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;">
-      <option value="">전체</option><option>손호영</option><option>박기빈</option>
-    </select>
-  </div>
-  <div style="display:flex;gap:6px;margin-bottom:14px">
-    <div class="sub-tab on" id="st-tx"      onclick="switchSubTab('tx')"      style="flex:1;padding:10px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:rgba(240,165,0,.1);color:var(--y);border:1.5px solid var(--y)">📦 납품</div>
-    <div class="sub-tab"    id="st-waste"   onclick="switchSubTab('waste')"   style="flex:1;padding:10px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:var(--card);color:var(--t3);border:1.5px solid var(--border)">♻️ 폐유</div>
-    <div class="sub-tab"    id="st-payment" onclick="switchSubTab('payment')" style="flex:1;padding:10px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:var(--card);color:var(--t3);border:1.5px solid var(--border)">💳 입금</div>
-  </div>
-  <div id="history-list"></div>
+  <!-- boss_patch.js injectHistoryUI()가 이 영역을 채웁니다 -->
+  <input type="hidden" id="hist-month">
 </div>
 
 <!-- 거래처 -->
@@ -303,7 +292,8 @@ select option{background:#161b22;}
 <!-- 단가 -->
 <div class="page" id="page-prices">
   <div class="page-title">💰 단가 관리</div>
-  <div class="hint">단가는 추가만 가능 (수정/삭제 불가) → 과거 거래 마진 보호</div>
+  <!-- ★ 수정 5: hint 텍스트 -->
+  <div class="hint">단가는 추가만 가능 → 과거 거래 마진 자동 보호 · 폐유단가는 오늘것만 수정 가능</div>
   <div class="sec-label">폐유 회사매입단가</div>
   <div class="info-box" style="margin-bottom:8px" id="waste-cur-box">
     <div class="info-row">
@@ -312,15 +302,16 @@ select option{background:#161b22;}
         <div class="iv y" id="waste-cur" style="font-size:20px">-</div>
         <div style="font-size:10px;color:var(--t3);margin-top:2px" id="waste-cur-date">-</div>
       </div>
-      <button onclick="openEditWaste(0)" style="padding:7px 12px;background:rgba(88,166,255,.1);border:none;border-radius:8px;color:var(--b);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif">수정</button>
+      <!-- ★ 수정 4: id=waste-edit-btn 추가 -->
+      <button id="waste-edit-btn" onclick="openEditWaste(0)" style="padding:7px 12px;background:rgba(88,166,255,.1);border:none;border-radius:8px;color:var(--b);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif">수정</button>
     </div>
+    <!-- ★ 수정 3: 이전단가 수정버튼 제거 (참고용만 표시) -->
     <div class="info-row" id="waste-prev-row" style="display:none">
       <div>
-        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">이전 단가</div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">이전 단가 <span style="font-size:9px">(참고용)</span></div>
         <div style="font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--t2)" id="waste-prev">-</div>
         <div style="font-size:10px;color:var(--t3);margin-top:2px" id="waste-prev-date">-</div>
       </div>
-      <button onclick="openEditWaste(1)" style="padding:7px 12px;background:rgba(88,166,255,.05);border:none;border-radius:8px;color:var(--t3);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif">수정</button>
     </div>
   </div>
   <div class="card" style="margin-bottom:16px">
@@ -424,7 +415,6 @@ let allTx=[], allPayments=[], allWaste=[], allPrices=[], allStores=[];
 let misuMap={};
 let storeFilter='전체';
 let editingStoreCode=null;
-// 자동배정 결과 캐시: { '거래처명': { son: N, bak: N } }
 let assignCounts={};
 
 async function init(){
@@ -439,7 +429,6 @@ async function init(){
   document.getElementById('nw-date').min=todayStr;
   document.getElementById('np-date').value=todayStr;
   document.getElementById('np-date').min=todayStr;
-  document.getElementById('hist-month').value=ym;
   await loadAll();
 }
 
@@ -456,8 +445,7 @@ async function loadAll(){
 async function loadMonths(){
   const res=await fetch(API+'?type=months');
   const d=await res.json();
-  const sel=document.getElementById('hist-month');
-  sel.innerHTML=(d.months||[]).map(m=>`<option value="${m}">${m}</option>`).join('');
+  // hist-month는 boss_patch.js가 관리
 }
 
 async function loadStores(){
@@ -487,10 +475,9 @@ let curSubTab='tx';
 let histPayments=[], histWaste=[];
 
 async function loadHistoryAll(){
-  let month=document.getElementById('hist-month').value;
+  let month=document.getElementById('hist-month')?.value;
   if(!month) month=document.getElementById('dash-month').value;
   if(!month) return;
-  document.getElementById('hist-month').value=month;
   const [y,m]=month.split('-');
   try{
     const [tr,pr,wr]=await Promise.all([
@@ -650,7 +637,6 @@ async function runAutoAssign(){
     assignCounts=d.counts||{};
     const assign=d.assign;
 
-    // 변경될 거래처 미리 계산
     const toUpdate=allStores.filter(s=>{
       const suggested=assign[s.이름]||'';
       return suggested && suggested!==s.담당;
@@ -663,14 +649,12 @@ async function runAutoAssign(){
       return;
     }
 
-    // 변경 내역 요약
     const preview=toUpdate.slice(0,5).map(s=>`• ${s.이름}: ${s.담당||'미배정'} → ${assign[s.이름]}`).join('\n');
     const more=toUpdate.length>5?`\n... 외 ${toUpdate.length-5}개`:'';
     if(!confirm(`담당자 자동배정 변경 내역 (${toUpdate.length}개)\n\n${preview}${more}\n\n저장할까요?`)){
       btn.disabled=false;btn.textContent='🔄 자동배정 실행 (전체 기간 기준)';return;
     }
 
-    // 순차 업데이트
     let done=0;
     for(const s of toUpdate){
       const updated={...s, 담당:assign[s.이름]||''};
@@ -726,12 +710,12 @@ function renderStores(){
     el.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><div style="font-size:13px">거래처 없음</div></div>';return;
   }
 
+  // ★ 수정 6: 삭제버튼 제거 (boss_patch.js renderStores 오버라이드가 담당)
   el.innerHTML=list.map(s=>{
     const misu=misuMap[s.이름]||0;
     const empCls=s.담당==='손호영'?'son':s.담당==='박기빈'?'bak':s.담당==='공유'?'share':'none';
     const empLabel=s.담당||'미배정';
 
-    // 납품횟수 미니 바
     const cnt=assignCounts[s.이름];
     const cntBar=cnt
       ? `<div class="count-bar">
@@ -758,7 +742,6 @@ function renderStores(){
         </div>
         <div style="display:flex;gap:5px;margin-left:8px">
           <button class="btn-edit" onclick="openStoreEdit('${s.코드}')">수정</button>
-          <button class="btn-danger" onclick="deleteStore('${s.코드}','${s.이름}')">삭제</button>
         </div>
       </div>
     </div>`;
@@ -852,14 +835,9 @@ async function deleteStore(code,name){
   }catch(e){showToast('⚠️ 삭제 실패');}
 }
 
-// ===== 내역 =====
+// ===== 내역 (boss_patch.js가 오버라이드) =====
 function switchSubTab(tab){
   curSubTab=tab;
-  document.querySelectorAll('.sub-tab').forEach(el=>{
-    el.style.background='var(--card)';el.style.color='var(--t3)';el.style.borderColor='var(--border)';
-  });
-  const on=document.getElementById(`st-${tab}`);
-  on.style.background='rgba(240,165,0,.1)';on.style.color='var(--y)';on.style.borderColor='var(--y)';
   renderHistoryByTab();
 }
 
@@ -870,11 +848,12 @@ function renderHistoryByTab(){
 }
 
 function renderHistory(){
-  const emp=document.getElementById('hist-emp').value;
+  const emp=document.getElementById('hist-emp')?.value||'';
   let list=allTx;
   if(emp)list=list.filter(t=>t.직원===emp);
   list=list.sort((a,b)=>b.id-a.id);
   const el=document.getElementById('history-list');
+  if(!el) return;
   if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">📝</div><div style="font-size:13px">내역 없음</div></div>';return;}
   el.innerHTML=list.map(t=>`
     <div class="tx-card">
@@ -901,10 +880,11 @@ function renderHistory(){
 }
 
 function renderWasteHistory(){
-  const emp=document.getElementById('hist-emp').value;
+  const emp=document.getElementById('hist-emp')?.value||'';
   let list=histWaste;
   if(emp) list=list.filter(w=>(w.직원||'')=== emp);
   const el=document.getElementById('history-list');
+  if(!el) return;
   if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">♻️</div><div style="font-size:13px">폐유납품 내역 없음</div></div>';return;}
   el.innerHTML=list.map(w=>{
     const 날짜=String(w.날짜||'').slice(0,10);
@@ -932,10 +912,11 @@ function renderWasteHistory(){
 }
 
 function renderPaymentHistory(){
-  const emp=document.getElementById('hist-emp').value;
+  const emp=document.getElementById('hist-emp')?.value||'';
   let list=histPayments;
   if(emp) list=list.filter(p=>(p.직원||'')=== emp);
   const el=document.getElementById('history-list');
+  if(!el) return;
   if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">💳</div><div style="font-size:13px">입금 내역 없음</div></div>';return;}
   const total=list.reduce((s,p)=>s+(+(p.금액||0)),0);
   el.innerHTML=`<div style="background:rgba(63,185,80,.06);border:1px solid rgba(63,185,80,.2);border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;justify-content:space-between">
@@ -963,7 +944,7 @@ function renderPaymentHistory(){
 
 async function deleteTx(id){
   if(!confirm('삭제할까요?'))return;
-  const month=document.getElementById('hist-month').value;
+  const month=document.getElementById('hist-month')?.value||document.getElementById('dash-month').value;
   const [y,m]=month.split('-');
   await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
     body:JSON.stringify({type:'delete_tx',id,year:+y,month:+m})});
@@ -1061,7 +1042,7 @@ function goTab(t){
   if(t==='history'){
     const hm=document.getElementById('hist-month');
     const dm=document.getElementById('dash-month').value;
-    if(!hm.value) hm.value=dm;
+    if(hm&&!hm.value) hm.value=dm;
     loadHistoryAll();
   }
   if(t==='stores') loadStores();
@@ -1177,7 +1158,6 @@ setInterval(()=>{
   loadAccounts();
 },30000);
 
-
 // ══════════════ 월마감 ══════════════
 async function runMonthlyClose(){
   const monthVal=document.getElementById('close-month').value;
@@ -1185,9 +1165,7 @@ async function runMonthlyClose(){
   if(!monthVal){showToast('마감할 월을 선택해주세요');return;}
   const [y,m]=monthVal.split('-');
   const empLabel=emp||'전체 직원';
-  if(!confirm(`${monthVal} ${empLabel} 월마감을 실행할까요?
-
-마감 후 취소 불가합니다.`))return;
+  if(!confirm(`${monthVal} ${empLabel} 월마감을 실행할까요?\n\n마감 후 취소 불가합니다.`))return;
   const btn=document.querySelector('[onclick="runMonthlyClose()"]');
   btn.disabled=true;btn.textContent='⏳ 마감 중...';
   try{
@@ -1243,7 +1221,6 @@ async function loadClosingHistory(){
   }catch(e){}
 }
 
-// ── 검색 헬퍼: 띄어쓰기 무시 ──
 function matchQ(target, q){
   if(!q)return true;
   const t=(target||'').replace(/\s/g,'').toLowerCase();
@@ -1258,7 +1235,6 @@ async function loadAccounts(){
   try{
     const res = await fetch(`${API}?type=config`);
     const d = await res.json();
-    // 계좌는 account_1, account_2... 키로 저장
     accounts = [];
     let i = 1;
     while(d.config[`account_${i}`]){
@@ -1309,7 +1285,6 @@ async function deleteAccount(idx){
 }
 
 async function saveAccounts(){
-  // 기존 계좌 키 전부 덮어쓰기
   for(let i=0; i<Math.max(accounts.length+1, 10); i++){
     const key = `account_${i+1}`;
     const value = accounts[i] ? JSON.stringify(accounts[i]) : '';
@@ -1325,6 +1300,7 @@ function showToast(msg){
 
 init();
 </script>
+<!-- ★ 수정 1: boss_patch.js 추가 -->
 <script src="boss_patch.js"></script>
 </body>
 </html>

@@ -655,50 +655,6 @@ function renderRouteProgress(done, total){
     </div>`;
 }
 
-const _origRenderRoute = typeof renderRoute === 'function' ? renderRoute : null;
-
-function renderRoute(){
-  const list = getRouteList();
-  const el = document.getElementById('route-list');
-  const prog = document.getElementById('route-progress');
-  if(!list.length){
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📍</div><div>루트 없음<br><span style="font-size:10px">출근탭에서 상차를 입력하거나<br>거래처 요일을 등록해주세요</span></div></div>';
-    if(prog) prog.innerHTML = '';
-    return;
-  }
-  updateDailyBar();
-  const savedCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
-  const doneCount = completedRoutes.filter(n => list.includes(n)).length;
-  renderRouteProgress(doneCount, list.length);
-  el.innerHTML = list.map((name, i) => {
-    const done = completedRoutes.includes(name);
-    const s = stores.find(x => x.이름 === name);
-    const cargo = savedCargos.find(c => c.거래처 === name);
-    const isMine = !s?.담당 || s?.담당 === EMP;
-    const meta = cargo ? `📦 ${cargo.유종} ${cargo.통수}통 상차` : (s?.유종 || '유종미등록');
-    const crossLabel = !isMine && s?.담당 ? `<span style="font-size:9px;color:var(--o);margin-left:4px">↔ ${s.담당}</span>` : '';
-    const visit = getLastVisit(name);
-    const visitBadge = visit
-      ? `<span style="font-size:9px;font-weight:600;color:${visit.color};background:rgba(0,0,0,.2);padding:2px 6px;border-radius:10px;margin-left:4px">${visit.label}</span>`
-      : '';
-    return `<div class="route-item ${done ? 'done' : ''}" id="ri-${i}" data-name="${name}">
-      <div class="route-order" style="background:${done ? 'var(--g)' : 'var(--p2)'};flex-shrink:0">${done ? '✓' : i+1}</div>
-      <div class="route-info" onclick="openDelivery('${name}')">
-        <div class="route-name">${name}${crossLabel}${visitBadge}</div>
-        <div class="route-meta" style="color:${cargo ? 'var(--o)' : 'var(--t2)'}">${meta}</div>
-      </div>
-      ${done
-        ? `<button onclick="deleteTxByStore('${name}')" style="padding:6px 10px;background:rgba(255,107,107,.12);border:none;border-radius:8px;color:var(--r);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">납품삭제</button>`
-        : `<button onclick="removeFromRoute('${name}')" style="padding:6px 10px;background:rgba(122,127,148,.12);border:none;border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">✕</button>`
-      }
-      <div class="drag-handle" draggable="true"
-        ondragstart="dragStart(event,'${name}')"
-        ondragover="dragOver(event)"
-        ondrop="dragDrop(event,'${name}')"
-        ondragend="dragEnd(event)">⠿</div>
-    </div>`;
-  }).join('');
-}
 
 // ── saveDelivery 오버라이드 (완료 애니메이션) ──
 const _origSaveDelivery = typeof saveDelivery === 'function' ? saveDelivery : null;

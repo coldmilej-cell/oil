@@ -753,7 +753,7 @@ async function init(){
   const hml=document.getElementById('hist-month-label'); if(hml) hml.textContent=ym;
 
   try{
-    const fetchOpts={signal:AbortSignal.timeout?AbortSignal.timeout(8000):undefined};
+    const fetchOpts={};
     const [sr,pr]=await Promise.all([
       fetch(API+'?type=stores',fetchOpts),
       fetch(API+'?type=prices',fetchOpts)
@@ -2519,8 +2519,10 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-init();
 </script>
 <script src="patch.js"></script>
+<script>
+init();
+</script>
 </body>
 </html>

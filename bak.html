@@ -119,6 +119,7 @@ body{font-family:'Noto Sans KR',sans-serif;background:var(--bg);color:var(--t);m
 .toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--g);color:#000;padding:11px 22px;border-radius:100px;font-size:13px;font-weight:700;opacity:0;transition:all .3s;z-index:999;white-space:nowrap;pointer-events:none;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 select option{background:#181c24;}
+/* 유종 검색 */
 .type-search-wrap{position:relative;margin-bottom:10px;}
 .type-search-input{width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--t);font-size:14px;font-family:'Noto Sans KR',sans-serif;outline:none;}
 .type-search-input:focus{border-color:var(--p);}
@@ -127,6 +128,7 @@ select option{background:#181c24;}
 .type-opt{padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);}
 .type-opt:last-child{border-bottom:none;}
 .type-opt:active,.type-opt:hover{background:var(--card2);}
+/* 반품 배지 */
 .badge.o{background:rgba(255,159,67,.12);color:var(--o);}
 .pay-mode-btn{flex:1;padding:10px;text-align:center;border-radius:10px;font-size:12px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--t3);border:1.5px solid var(--border);transition:all .15s;}
 .pay-mode-btn.on{background:rgba(108,143,255,.1);color:var(--p);border-color:var(--p);}
@@ -268,7 +270,7 @@ select option{background:#181c24;}
       <div class="search-results" id="search-results"></div>
     </div>
     <div id="store-selected-area" style="display:none">
-      <div class="store-chip">
+      <div class="store-chip" style="margin-bottom:8px">
         <div><div class="store-chip-name" id="chip-name"></div><div style="font-size:11px;color:var(--t2);margin-top:2px" id="chip-meta"></div></div>
         <div class="btn-danger" onclick="clearStore()">✕</div>
       </div>
@@ -287,6 +289,7 @@ select option{background:#181c24;}
           <div id="store-recent-tx" style="font-size:12px;color:var(--t2)">-</div>
         </div>
       </div>
+      <!-- 폐유 전용 거래처 계좌 -->
       <div id="store-account-box" style="display:none;background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.25);border-radius:10px;padding:10px 14px;margin-top:8px">
         <div style="font-size:10px;font-weight:700;color:var(--o);margin-bottom:6px">💸 폐유 입금 계좌 (내가 보낼 곳)</div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
@@ -477,7 +480,10 @@ select option{background:#181c24;}
 <!-- 내역 -->
 <div class="page" id="page-history">
   <div class="page-hdr">
-    <div><div class="page-title">📋 내 내역</div></div>
+    <div>
+      <div class="page-title">📋 내 내역</div>
+      <div style="font-size:11px;color:var(--t3)" id="hist-month-label"></div>
+    </div>
   </div>
   <!-- 날짜 선택 -->
   <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
@@ -747,7 +753,7 @@ async function init(){
   const hml=document.getElementById('hist-month-label'); if(hml) hml.textContent=ym;
 
   try{
-    const fetchOpts={signal:AbortSignal.timeout?AbortSignal.timeout(8000):undefined};
+    const fetchOpts={};
     const [sr,pr]=await Promise.all([
       fetch(API+'?type=stores',fetchOpts),
       fetch(API+'?type=prices',fetchOpts)
@@ -1157,6 +1163,7 @@ async function saveCheckin(){
     }
     // 상차 로컬 저장 (납품탭 연동)
     const savedCargos=validCargos.map(c=>({거래처:c.거래처,유종:c.유종,통수:c.통수}));
+    // 기존 상차와 병합 (여러번 출근 저장 시)
     const prevCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
     const mergedCargos=[...prevCargos];
     savedCargos.forEach(nc=>{
@@ -1259,10 +1266,10 @@ function renderRoute(){
     el.innerHTML='<div class="empty"><div class="empty-icon">📍</div><div>루트 없음<br><span style="font-size:10px">출근탭에서 상차를 입력하거나<br>거래처 요일을 등록해주세요</span></div></div>';
     if(prog)prog.textContent='';return;
   }
-  updateDailyBar();
   const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
   const doneCount=completedRoutes.filter(n=>list.includes(n)).length;
   if(prog)prog.textContent=`${doneCount}/${list.length}`;
+  updateDailyBar();
   el.innerHTML=list.map((name,i)=>{
     const done=completedRoutes.includes(name);
     const s=stores.find(x=>x.이름===name);
@@ -1464,6 +1471,7 @@ function addItem(defaultType='',defaultQty=0){
   if(defaultType&&defaultQty)calcItem(id);
 }
 function removeItem(id){items=items.filter(i=>i.id!==id);document.getElementById(`item-${id}`)?.remove();calcDelivery();}
+// 유종 검색 드롭다운
 function onTypeSearch(id){
   const q=(document.getElementById(`it-q-${id}`)?.value||'').trim().toLowerCase();
   const dd=document.getElementById(`it-dd-${id}`);
@@ -1803,6 +1811,7 @@ async function saveDelivery(){
   const cutoff=new Date();cutoff.setDate(cutoff.getDate()-7);
   const cutoffStr=cutoff.toISOString().slice(0,10);
   localStorage.setItem(`tx_${EMP}_v3`,JSON.stringify(txList.filter(x=>x.날짜>=cutoffStr).slice(0,500)));
+  // 반품 시 차량 재고 복귀
   const returnItems=items.filter(i=>i.qty<0);
   if(returnItems.length>0){
     const todayCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
@@ -1816,22 +1825,32 @@ async function saveDelivery(){
   if(!completedRoutes.includes(storeName))completedRoutes.push(storeName);
   localStorage.setItem(`done_${EMP}_${t}`,JSON.stringify(completedRoutes));
   const msg=returnItems.length>0?'↩️ 반품 저장 (차량재고 복귀)':'✅ 저장됐어요!';
-  // 현금지급/이체지급 → 입금탭에 자동 기록
+  // 현금지급/이체지급 → 입금탭에 자동 기록 (우리가 지급한 것)
   if(curPay==='현금지급'||curPay==='이체지급'||curPay==='미수차감폐유'){
     const payAmt2=wastePay||Math.abs(charge);
     if(payAmt2>0){
       await savePayment({
-        거래처:storeName,금액:-payAmt2,날짜:t,
-        입금자명:'폐유대금',방법:curPay==='이체지급'?'계좌이체':'현금지급',비고:'폐유수거 대금 지급'
+        거래처:storeName,
+        금액:-payAmt2, // 음수 = 지급
+        날짜:t,
+        입금자명:'폐유대금',
+        방법:curPay==='이체지급'?'계좌이체':'현금지급',
+        비고:'폐유수거 대금 지급'
       });
     }
   }
+  // 현금수령 → 입금탭 자동 기록
   if(curPay==='현금'&&payAmt>0){
     await savePayment({
-      거래처:storeName,금액:payAmt,날짜:t,
-      입금자명:curStore?.입금자||storeName,방법:'현금',비고:'현장 현금수령'
+      거래처:storeName,
+      금액:payAmt,
+      날짜:t,
+      입금자명:curStore?.입금자||storeName,
+      방법:'현금',
+      비고:'현장 현금수령'
     });
   }
+  // 서버 전송 (실패 시 큐에 저장)
   await safeFetch({type:'tx',tx}, ()=>{
     showToast(msg);
     hideDeliveryForm();
@@ -2500,8 +2519,10 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-init();
 </script>
 <script src="patch.js"></script>
+<script>
+init();
+</script>
 </body>
 </html>

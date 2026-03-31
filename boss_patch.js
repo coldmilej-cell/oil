@@ -729,3 +729,20 @@ async function addPrice(){
   await loadPrices();
   renderPrices(); // ← patch 버전 renderPrices 명시 호출
 }
+
+// ══════════════ loadPrices 오버라이드 - 항상 renderPrices 까지 실행 ══════════════
+// boss.html 원본 loadPrices()가 Promise 반환 안 할 수 있어서 직접 오버라이드
+
+async function loadPrices(){
+  try{
+    const res = await fetch(API+'?type=prices');
+    const d = await res.json();
+    if(typeof allPrices !== 'undefined'){
+      allPrices = d.prices || [];
+    }
+  }catch(e){
+    console.error('loadPrices 실패:', e);
+  }
+  // 항상 renderPrices 실행 (데이터 없어도 빈 화면 보여줌)
+  renderPrices();
+}

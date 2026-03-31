@@ -2551,6 +2551,38 @@ async function copyReceipt(){
   document.getElementById('receipt-btn-wrap')?.remove();
 }
 
+
+async function deletePayment(payId, storeName){
+  if(!confirm(`${storeName} 입금을 삭제할까요?`)) return;
+  const now = new Date();
+  try{
+    const res = await fetch(API, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({type:'delete_payment', id: payId,
+        year: now.getFullYear(), month: now.getMonth()+1})
+    });
+    const d = await res.json();
+    if(d.ok === false){ showToast('⚠️ ' + d.error); return; }
+  }catch(e){}
+  todayPayments = todayPayments.filter(p => String(p.id) !== String(payId));
+  localStorage.setItem(`pay_${EMP}_today`, JSON.stringify(todayPayments));
+  showToast('✅ 삭제됐어요');
+  renderTodayPayments();
+  calcSettlement();
+}
+
+
+function downloadTemplate(){
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet([
+    ['날짜', '입금자', '금액'],
+    ['2025-01-01', '홍길동', '100000'],
+    ['2025-01-02', '김철수', '200000'],
+  ]);
+  XLSX.utils.book_append_sheet(wb, ws, '입금내역');
+  XLSX.writeFile(wb, '입금내역_양식.xlsx');
+}
+
 function showToast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);

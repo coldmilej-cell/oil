@@ -840,8 +840,8 @@ function renderStores(){
         <div style="display:flex;gap:5px;margin-left:8px;flex-direction:column;">
           <button class="btn-edit" onclick="openStoreEdit('${s.코드}')">수정</button>
           ${s.상태==='비활성'
-            ? `<button onclick="toggleStoreActive('${s.코드}','활성')" style="padding:5px 8px;background:rgba(61,220,132,.1);border:1px solid var(--g);border-radius:7px;color:var(--g);font-size:10px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;">활성화</button>`
-            : `<button onclick="toggleStoreActive('${s.코드}','비활성')" style="padding:5px 8px;background:rgba(255,107,107,.1);border:1px solid var(--r);border-radius:7px;color:var(--r);font-size:10px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;">비활성</button>`
+            ? '<button onclick="toggleStoreActive(\''+s.코드+'\',\'활성\')" style="padding:5px 8px;background:rgba(61,220,132,.1);border:1px solid var(--g);border-radius:7px;color:var(--g);font-size:10px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;white-space:nowrap;">활성화</button>'
+            : '<button onclick="toggleStoreActive(\''+s.코드+'\',\'비활성\')" style="padding:5px 8px;background:rgba(255,107,107,.1);border:1px solid var(--r);border-radius:7px;color:var(--r);font-size:10px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;white-space:nowrap;">비활성</button>'
           }
         </div>
       </div>

@@ -709,37 +709,59 @@ async function init(){
   await loadAll();
 }
 
+// fetch + 타임아웃 래퍼
+async function fetchWithTimeout(url, ms=12000){
+  const ctrl = new AbortController();
+  const timer = setTimeout(()=>ctrl.abort(), ms);
+  try{
+    const r = await fetch(url, {signal: ctrl.signal});
+    clearTimeout(timer);
+    return r;
+  }catch(e){
+    clearTimeout(timer);
+    throw e;
+  }
+}
+
 async function loadAll(){
   showToast('📡 불러오는 중...');
   if(typeof setBossSplash === 'function') setBossSplash('loading', '서버 연결 중...');
+  // 15초 전체 타임아웃
+  const overall = setTimeout(()=>{
+    if(typeof setBossSplash === 'function') setBossSplash('offline', '연결 시간 초과', '새로고침 후 재시도하세요');
+    try{ renderDashboard(); }catch(e){}
+  }, 15000);
   try{
-    // stores/prices 먼저 (dashboard에 필요)
     await Promise.all([loadMonths(), loadPrices(), loadStores()]);
-    // dashboard는 stores 로드 후 실행 (미수 계산 등)
     await loadDashboard();
+    clearTimeout(overall);
     updateAssignStats();
     showToast('✅ 완료!');
     if(typeof setBossSplash === 'function') setBossSplash('success', '동기화 완료');
   }catch(e){
-    showToast('⚠️ 연결 실패');
+    clearTimeout(overall);
+    showToast('⚠️ 연결 실패 — 재시도 중...');
     if(typeof setBossSplash === 'function') setBossSplash('offline', '오프라인 모드', '저장된 데이터로 시작합니다');
-    // 에러여도 로컬 데이터로 진입
     try{ renderDashboard(); }catch(e2){}
   }
 }
 
 async function loadMonths(){
-  const res=await fetch(API+'?type=months');
-  const d=await res.json();
-  // hist-month는 boss_patch.js가 관리
+  try{
+    const res=await fetchWithTimeout(API+'?type=months');
+    const d=await res.json();
+    // hist-month는 boss_patch.js가 관리
+  }catch(e){ console.warn('loadMonths 실패',e); }
 }
 
 async function loadStores(){
-  const res=await fetch(API+'?type=stores');
-  const d=await res.json();
-  allStores=d.stores||[];
-  updateAssignStats();
-  renderStores();
+  try{
+    const res=await fetchWithTimeout(API+'?type=stores');
+    const d=await res.json();
+    allStores=d.stores||[];
+    updateAssignStats();
+    renderStores();
+  }catch(e){ console.warn('loadStores 실패',e); }
 }
 
 async function loadDashboard(){
@@ -758,8 +780,8 @@ async function loadDashboard(){
   if(!month)return;
   const [y,m]=month.split('-');
   const [tr,pr,wr]=await Promise.all([
-    fetch(`${API}?type=tx&year=${y}&month=${m}`).then(r=>r.json()),
-    fetch(`${API}?type=payments&year=${y}&month=${m}`).then(r=>r.json()),
+    fetchWithTimeout(`${API}?type=tx&year=${y}&month=${m}`).then(r=>r.json()),
+    fetchWithTimeout(`${API}?type=payments&year=${y}&month=${m}`).then(r=>r.json()),
     fetch(`${API}?type=waste_deliveries&year=${y}&month=${m}`).then(r=>r.json()),
   ]);
   allTx=(tr.rows||[]).map(parseTx);
@@ -794,10 +816,12 @@ async function loadHistoryAll(){
 }
 
 async function loadPrices(){
-  const res=await fetch(API+'?type=prices');
-  const d=await res.json();
-  allPrices=d.prices||[];
-  renderPrices();
+  try{
+    const res=await fetchWithTimeout(API+'?type=prices');
+    const d=await res.json();
+    allPrices=d.prices||[];
+    renderPrices();
+  }catch(e){ console.warn('loadPrices 실패',e); }
 }
 
 function parseTx(r){

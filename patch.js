@@ -1492,7 +1492,9 @@ async function saveInlineDelivery(name, idx){
 
   // 현금/폐유 자동 
   const _aidx = (typeof getRouteList==='function') ? getRouteList().indexOf(name) : -1;
-  if(_aidx >= 0) setTimeout(()=>{ if(typeof playDoneAnimation==='function') playDoneAnimation(_aidx); }, 80);입금
+  if(_aidx >= 0) setTimeout(()=>{ if(typeof playDoneAnimation==='function') playDoneAnimation(_aidx); }, 80);
+
+  // 현금/폐유 자동 입금
   const s = stores.find(x=>x.이름===name);
   if(pay==='현금'&&payAmt>0)
     await savePayment({거래처:name,금액:payAmt,날짜:t,입금자명:s?.입금자||name,방법:'현금',비고:'현장현금수령'});
@@ -1650,22 +1652,55 @@ function renderCheckinDaySummary(logs){
 let _lastUrgentCheck = '';
 
 function checkUrgentAssignments(){
-  if(typeof stores === 'undefined') return;
-  const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
-  const empName = typeof EMP !== 'undefined' ? EMP : '';
-  const urgent = stores.filter(s =>
-    s.배정상태 === '긴급배정' &&
-    s.배정날짜 === t &&
-    (s.배정직원 === empName || s.담당 === empName) &&
-    s.상태 !== '비활성' &&
-    (typeof completedRoutes === 'undefined' || !completedRoutes.includes(s.이름))
-  );
-  if(!urgent.length) return;
-  const urgentKey = urgent.map(s=>s.이름).sort().join(',');
-  if(urgentKey === _lastUrgentCheck) return;
-  _lastUrgentCheck = urgentKey;
-  if(typeof renderRoute === 'function') renderRoute();
-  if(typeof showToast === 'function') showToast(`🚨 긴급 배정 ${urgent.length}건 — ${urgent.map(s=>s.이름).join(', ')}`);
+  // 30초마다 GAS에서 stores 재조회해서 긴급배정 감지
+  fetch(typeof API !== 'undefined' ? API + '?type=stores' : '')
+    .then(r => r.json())
+    .then(d => {
+      if(!d.stores || !d.stores.length) return;
+      // 로컬 stores 업데이트
+      if(typeof stores !== 'undefined') {
+        stores = d.stores.map(s=>({
+          코드:s.코드||'',이름:s.이름||'',담당:s.담당||'',요일:s.요일||'',
+          유종:s.유종||'',연락처:s.연락처||'',입금자:s.입금자||'',
+          배정상태:s.배정상태||'',배정직원:s.배정직원||'',배정날짜:s.배정날짜||'',
+          상태:s.상태||'활성'
+        }));
+        localStorage.setItem('stores_v3', JSON.stringify(stores));
+      }
+      // 긴급배정 확인
+      const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
+      const empName = typeof EMP !== 'undefined' ? EMP : '';
+      const urgent = (typeof stores !== 'undefined' ? stores : []).filter(s =>
+        s.배정상태 === '긴급배정' &&
+        s.배정날짜 === t &&
+        (s.배정직원 === empName || s.담당 === empName) &&
+        s.상태 !== '비활성' &&
+        (typeof completedRoutes === 'undefined' || !completedRoutes.includes(s.이름))
+      );
+      if(!urgent.length) return;
+      const urgentKey = urgent.map(s=>s.이름).sort().join(',');
+      if(urgentKey === _lastUrgentCheck) return;
+      _lastUrgentCheck = urgentKey;
+      if(typeof renderRoute === 'function') renderRoute();
+      if(typeof showToast === 'function') showToast(`🚗 긴급배정: ${urgent.map(s=>s.이름).join(', ')}`);
+    })
+    .catch(() => {
+      // 네트워크 실패 시 로컬 캐시로 처리
+      if(typeof stores === 'undefined') return;
+      const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
+      const empName = typeof EMP !== 'undefined' ? EMP : '';
+      const urgent = stores.filter(s =>
+        s.배정상태 === '긴급배정' &&
+        s.배정날짜 === t &&
+        (s.배정직원 === empName || s.담당 === empName) &&
+        s.상태 !== '비활성'
+      );
+      if(!urgent.length) return;
+      const urgentKey = urgent.map(s=>s.이름).sort().join(',');
+      if(urgentKey === _lastUrgentCheck) return;
+      _lastUrgentCheck = urgentKey;
+      if(typeof renderRoute === 'function') renderRoute();
+    });
 }
 
 (function startUrgentCheck2(){

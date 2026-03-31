@@ -279,7 +279,198 @@ function goTab(t){
     }
     loadStores();
   }
-  if(t==='prices') loadPrices();
+  if(t==='prices'){
+    loadPrices().then(()=>renderPrices());
+  }
+  if(t==='history'){
+    injectHistoryUI();
+    const hm = document.getElementById('hist-month');
+    const dm = document.getElementById('dash-month')?.value || '';
+    if(hm && !hm.value) hm.value = dm;
+    loadHistoryUnified(hm?.value || dm);
+  }
+}
+
+// ══════════════ 통합 내역탭 ══════════════
+let _histMonth='', _histEmp='', _histOpen=new Set(), _histData={tx:[],pay:[],waste:[]}, _availMonths=[];
+
+function injectHistoryUI(){
+  const page=document.getElementById('page-history');
+  if(!page||page.dataset.injected) return;
+  page.dataset.injected='1';
+  page.innerHTML=`
+    <div style="padding:12px 0 4px;font-size:18px;font-weight:900">📋 전체 내역</div>
+    <div id="hist-month-slider" style="display:flex;align-items:center;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;scrollbar-width:none"></div>
+    <div style="display:flex;gap:6px;margin-bottom:12px">
+      ${['전체','손호영','박기빈'].map(e=>`<button onclick="setHistEmp('${e}')" id="hist-emp-btn-${e}"
+        style="padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--t3);font-family:'Noto Sans KR',sans-serif">${e}</button>`).join('')}
+      <div id="hist-loading" style="margin-left:auto;font-size:11px;color:var(--t3);align-self:center;display:none">⏳</div>
+    </div>
+    <div id="hist-month-summary" style="display:none;background:var(--card2);border-radius:12px;padding:12px 14px;margin-bottom:12px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
+        <div><div style="font-size:9px;color:var(--t3);margin-bottom:3px">납품 청구</div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--y)" id="hist-sum-charge">-</div></div>
+        <div><div style="font-size:9px;color:var(--t3);margin-bottom:3px">입금</div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--g)" id="hist-sum-pay">-</div></div>
+        <div><div style="font-size:9px;color:var(--t3);margin-bottom:3px">미수잔액</div><div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--r)" id="hist-sum-misu">-</div></div>
+      </div>
+    </div>
+    <div id="hist-day-list"></div>`;
+  loadAvailMonths();
+}
+
+async function loadAvailMonths(){
+  try{
+    const res=await fetch(`${API}?type=months`);
+    const d=await res.json();
+    _availMonths=d.months||[];
+  }catch(e){
+    const now=new Date();
+    _availMonths=[`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`];
+  }
+  renderMonthSlider();
+}
+
+function renderMonthSlider(){
+  const el=document.getElementById('hist-month-slider');
+  if(!el) return;
+  const months=_availMonths.length?_availMonths:[_histMonth].filter(Boolean);
+  const current=_histMonth||months[0]||'';
+  el.innerHTML=months.map(m=>{
+    const isOn=m===current;
+    const [y,mo]=m.split('-');
+    return `<button onclick="setHistMonth('${m}')"
+      style="padding:8px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;font-family:'Noto Sans KR',sans-serif;border:1.5px solid ${isOn?'var(--y)':'var(--border)'};background:${isOn?'rgba(240,165,0,.12)':'var(--card)'};color:${isOn?'var(--y)':'var(--t3)'}">
+      ${y.slice(2)}년 ${parseInt(mo)}월</button>`;
+  }).join('');
+  setTimeout(()=>{
+    const btns=el.querySelectorAll('button');
+    const idx=months.indexOf(current);
+    if(btns[idx]) btns[idx].scrollIntoView({inline:'center',behavior:'smooth'});
+  },100);
+}
+
+function setHistMonth(m){
+  _histMonth=m; _histOpen.clear();
+  renderMonthSlider(); loadHistoryUnified(m);
+}
+
+function setHistEmp(e){
+  _histEmp=e==='전체'?'':e;
+  ['전체','손호영','박기빈'].forEach(name=>{
+    const btn=document.getElementById(`hist-emp-btn-${name}`); if(!btn) return;
+    const isOn=(name==='전체'&&!_histEmp)||name===_histEmp;
+    btn.style.borderColor=isOn?'var(--y)':'var(--border)';
+    btn.style.background=isOn?'rgba(240,165,0,.12)':'var(--card)';
+    btn.style.color=isOn?'var(--y)':'var(--t3)';
+  });
+  renderHistoryDays();
+}
+
+async function loadHistoryUnified(month){
+  if(!month) return;
+  _histMonth=month;
+  setHistEmp(_histEmp||'');
+  const loadingEl=document.getElementById('hist-loading');
+  if(loadingEl) loadingEl.style.display='inline';
+  const [y,m]=month.split('-');
+  try{
+    const [tr,pr,wr]=await Promise.all([
+      fetch(`${API}?type=tx&year=${y}&month=${m}&limit=500`).then(r=>r.json()),
+      fetch(`${API}?type=payments&year=${y}&month=${m}`).then(r=>r.json()),
+      fetch(`${API}?type=waste_deliveries&year=${y}&month=${m}`).then(r=>r.json()),
+    ]);
+    _histData.tx=(tr.rows||[]).map(r=>({...r,_type:'tx'}));
+    _histData.pay=(pr.rows||[]).map(r=>({...r,_type:'pay'}));
+    _histData.waste=(wr.rows||[]).map(r=>({...r,_type:'waste'}));
+  }catch(e){ _histData={tx:[],pay:[],waste:[]}; }
+  if(loadingEl) loadingEl.style.display='none';
+  renderHistoryDays();
+}
+
+function renderHistoryDays(){
+  const el=document.getElementById('hist-day-list');
+  const sumEl=document.getElementById('hist-month-summary');
+  if(!el) return;
+  const tx=_histEmp?_histData.tx.filter(r=>r.직원===_histEmp):_histData.tx;
+  const pay=_histEmp?_histData.pay.filter(r=>r.직원===_histEmp):_histData.pay;
+  const waste=_histEmp?_histData.waste.filter(r=>r.직원===_histEmp):_histData.waste;
+  const totalCharge=tx.reduce((s,r)=>s+(+r.차감청구||0),0);
+  const totalPay=pay.reduce((s,r)=>s+(+r.금액||0),0);
+  const totalMisu=Math.max(0,totalCharge-totalPay);
+  if(sumEl){
+    sumEl.style.display='block';
+    const sc=document.getElementById('hist-sum-charge'); if(sc) sc.textContent=totalCharge.toLocaleString()+'원';
+    const sp=document.getElementById('hist-sum-pay');    if(sp) sp.textContent=totalPay.toLocaleString()+'원';
+    const sm=document.getElementById('hist-sum-misu');   if(sm) sm.textContent=totalMisu.toLocaleString()+'원';
+  }
+  const byDate={};
+  const add=(date,item)=>{ if(!byDate[date])byDate[date]=[]; byDate[date].push(item); };
+  tx.forEach(r=>add(String(r.날짜||'').slice(0,10),r));
+  pay.forEach(r=>add(String(r.날짜||'').slice(0,10),r));
+  waste.forEach(r=>add(String(r.날짜||'').slice(0,10),r));
+  const DAYS=['일','월','화','수','목','금','토'];
+  const dates=Object.keys(byDate).filter(Boolean).sort().reverse();
+  if(!dates.length){ el.innerHTML='<div class="empty"><div class="empty-icon">📝</div><div style="font-size:13px">내역 없음</div></div>'; return; }
+  el.innerHTML=dates.map(date=>{
+    const items=byDate[date];
+    const txI=items.filter(r=>r._type==='tx');
+    const payI=items.filter(r=>r._type==='pay');
+    const wasteI=items.filter(r=>r._type==='waste');
+    const dayCharge=txI.reduce((s,r)=>s+(+r.차감청구||0),0);
+    const dayPay=payI.reduce((s,r)=>s+(+r.금액||0),0);
+    const dt=new Date(date); const dayName=DAYS[dt.getDay()];
+    const isOpen=_histOpen.has(date);
+    const badges=[
+      txI.length?`<span style="font-size:10px;color:var(--y)">📦 ${txI.length}건</span>`:'',
+      payI.length?`<span style="font-size:10px;color:var(--g)">💳 ${payI.length}건</span>`:'',
+      wasteI.length?`<span style="font-size:10px;color:var(--o)">♻️ ${wasteI.length}건</span>`:'',
+    ].filter(Boolean).join(' ');
+    const detailHtml=isOpen?`
+      <div style="border-top:1px solid var(--border);margin-top:10px;padding-top:10px">
+        ${txI.map(r=>{
+          const isMisu=r.미수==='TRUE'||r.미수===true;
+          const mc=isMisu?'var(--r)':r.수금방법==='현금'?'var(--g)':'var(--t2)';
+          return `<div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+            <div><div style="font-size:12px;font-weight:700">📦 ${r.거래처||''}</div>
+            <div style="font-size:10px;color:var(--t2);margin-top:2px">${r.직원||''} · ${r.유종||''} ${r.통수||0}통 · <span style="color:${mc}">${r.수금방법||''}</span></div></div>
+            <div style="text-align:right">
+              <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--y)">${(+r.차감청구||0).toLocaleString()}원</div>
+              ${+r.폐유kg>0?`<div style="font-size:10px;color:var(--o)">♻️ ${r.폐유kg}kg</div>`:''}
+            </div></div>`;
+        }).join('')}
+        ${wasteI.map(r=>`
+          <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+            <div><div style="font-size:12px;font-weight:700">♻️ 폐유납품</div>
+            <div style="font-size:10px;color:var(--t2);margin-top:2px">${r.직원||''} · ${+r.총실중량||0}kg · ${r.파레트수||0}파레트</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--g)">${(+r.폐유수입||0).toLocaleString()}원</div>
+          </div>`).join('')}
+        ${payI.map(r=>`
+          <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+            <div><div style="font-size:12px;font-weight:700">💳 ${r.거래처||''}</div>
+            <div style="font-size:10px;color:var(--t2);margin-top:2px">${r.직원||''} · ${r.입금자명||''} · ${r.방법||''}</div></div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--g)">${(+r.금액||0).toLocaleString()}원</div>
+          </div>`).join('')}
+      </div>`:'';
+    return `<div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:13px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleHistDay('${date}')">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700">${date.slice(5)}</div>
+          <div style="font-size:11px;color:var(--t3)">(${dayName})</div>
+          <div style="display:flex;gap:6px">${badges}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px">
+          ${dayCharge>0?`<div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--y)">${dayCharge.toLocaleString()}원</div>`:''}
+          ${dayPay>0&&!dayCharge?`<div style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--g)">${dayPay.toLocaleString()}원</div>`:''}
+          <div style="color:var(--t3);font-size:12px">${isOpen?'▲':'▼'}</div>
+        </div>
+      </div>
+      ${detailHtml}
+    </div>`;
+  }).join('');
+}
+
+function toggleHistDay(date){
+  if(_histOpen.has(date)) _histOpen.delete(date); else _histOpen.add(date);
+  renderHistoryDays();
 }
 
 // ══════════════ aging 섹션 동적 삽입 ══════════════
@@ -341,4 +532,200 @@ async function init(){
       loadAccounts();
     }
   }, 30000);
+}
+
+// ══════════════ 단가 날짜 정규화 (ISO 형식 → YYYY-MM-DD) ══════════════
+
+function normalizeDate(d){
+  const s = String(d||'').trim();
+  if(!s) return '-';
+  // ISO 형식: 2026-03-25T15:00:00.000Z → 2026-03-25
+  if(s.includes('T')) return s.slice(0,10);
+  // 이미 YYYY-MM-DD 형식
+  if(/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Date 객체로 파싱 시도
+  const dt = new Date(s);
+  if(!isNaN(dt.getTime())) return dt.toISOString().slice(0,10);
+  return s.slice(0,10);
+}
+
+// renderPrices 오버라이드 - 날짜 NaN 수정
+function renderPrices(){
+  // 날짜 정규화 적용한 allPrices 복사
+  const prices = (typeof allPrices !== 'undefined' ? allPrices : []).map(p => ({
+    ...p,
+    적용일자: normalizeDate(p.적용일자)
+  }));
+
+  // 폐유 단가
+  const wastePrices = prices
+    .filter(p => p.품명 === '폐유매입단가')
+    .sort((a,b) => b.적용일자.localeCompare(a.적용일자));
+
+  const curEl    = document.getElementById('waste-cur');
+  const curDate  = document.getElementById('waste-cur-date');
+  const prevEl   = document.getElementById('waste-prev');
+  const prevDate = document.getElementById('waste-prev-date');
+  const prevRow  = document.getElementById('waste-prev-row');
+
+  if(wastePrices.length > 0){
+    const cur = wastePrices[0];
+    const val = parseFloat(cur.출고가);
+    if(curEl)   curEl.textContent   = isNaN(val) ? '-' : val.toLocaleString() + '원/kg';
+    if(curDate) curDate.textContent = cur.적용일자 + ' 부터';
+
+    if(wastePrices.length > 1){
+      const prev = wastePrices[1];
+      const prevVal = parseFloat(prev.출고가);
+      if(prevRow)  prevRow.style.display = 'flex';
+      if(prevEl)   prevEl.textContent   = isNaN(prevVal) ? '-' : prevVal.toLocaleString() + '원/kg';
+      if(prevDate) prevDate.textContent = prev.적용일자 + ' 부터';
+    } else {
+      if(prevRow) prevRow.style.display = 'none';
+    }
+  } else {
+    if(curEl)   curEl.textContent   = '-';
+    if(curDate) curDate.textContent = '-';
+    if(prevRow) prevRow.style.display = 'none';
+  }
+
+  // 식용유 단가 목록
+  const el = document.getElementById('price-list');
+  if(!el) return;
+
+  // 품목별 최신 단가 (폐유 제외)
+  const latest = {};
+  prices.filter(p => p.품명 && p.품명 !== '폐유매입단가').forEach(p => {
+    if(!latest[p.품명] || p.적용일자 > latest[p.품명].적용일자){
+      latest[p.품명] = p;
+    }
+  });
+
+  const items = Object.values(latest).sort((a,b) => a.품명.localeCompare(b.품명,'ko'));
+
+  if(!items.length){
+    el.innerHTML = '<div class="empty"><div class="empty-icon">💰</div><div style="font-size:13px">단가 없음</div></div>';
+    return;
+  }
+
+  el.innerHTML = items.map(p => {
+    const val = parseFloat(p.출고가);
+    const displayVal = isNaN(val) ? '-' : val.toLocaleString() + '원';
+    const cat = p.구분 || '';
+    const tagMap = { '수수료':'price-tag 수수료', '범용':'price-tag 범용', '전용':'price-tag 전용', '식자재':'price-tag 식자재' };
+    const tagCls = tagMap[cat] || 'price-tag 범용';
+    return `
+    <div class="price-item">
+      <div>
+        <div class="price-name">${p.품명}
+          ${cat ? `<span class="${tagCls}">${cat}</span>` : ''}
+        </div>
+        <div class="price-meta">${p.적용일자} 기준</div>
+      </div>
+      <div class="price-val">${displayVal}</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════ 타이밍 문제 해결: 로드 직후 강제 재실행 ══════════════
+// boss.html의 init()이 boss_patch.js보다 먼저 실행되므로
+// 패치 로드 완료 후 거래처 목록 & aging 섹션을 강제로 다시 그림
+(function applyPatchAfterLoad(){
+  // DOM 완전 로드 후 실행
+  const apply = () => {
+    // 1. 거래처 탭이 열려있으면 renderStores 재실행
+    if(typeof renderStores === 'function' && typeof allStores !== 'undefined'){
+      renderStores();
+    }
+
+    // 2. 비활성 필터 버튼 추가
+    const filterRow = document.querySelector('.filter-row');
+    if(filterRow && !document.querySelector('[data-filter="비활성"]')){
+      const btn = document.createElement('button');
+      btn.className = 'filter-btn';
+      btn.setAttribute('data-filter', '비활성');
+      btn.textContent = '비활성';
+      btn.onclick = () => setStoreFilter('비활성');
+      filterRow.appendChild(btn);
+    }
+
+    // 3. aging 섹션 삽입 (현황 탭)
+    insertAgingSection();
+
+    // 4. 단가탭 현재 열려있으면 재렌더
+    if(document.getElementById('page-prices')?.classList.contains('on')){
+      renderPrices();
+    }
+  };
+
+  // DOMContentLoaded 이미 지났을 수 있으므로 즉시 + setTimeout 둘 다
+  if(document.readyState === 'complete' || document.readyState === 'interactive'){
+    setTimeout(apply, 100);
+  } else {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(apply, 100));
+  }
+})();
+
+// ══════════════ 단가 저장 후 renderPrices 연동 ══════════════
+
+async function addWastePrice(){
+  const 단가val = document.getElementById('nw-price')?.value;
+  const 날짜 = document.getElementById('nw-date')?.value;
+  if(!단가val || !날짜){ showToast('단가와 날짜를 입력해주세요'); return; }
+  const today = new Date().toISOString().slice(0,10);
+  if(날짜 < today){ showToast('⚠️ 오늘 이전 날짜는 불가 (오늘부터 등록 가능)'); return; }
+
+  const wastePrices = (allPrices||[])
+    .filter(p=>p.품명==='폐유매입단가')
+    .sort((a,b)=>String(b.적용일자).localeCompare(String(a.적용일자)));
+  const curPrice = wastePrices.length > 0
+    ? (+wastePrices[0].출고가).toLocaleString()+'원/kg' : '없음';
+
+  if(!confirm(`폐유 단가 변경\n\n현재: ${curPrice}\n변경: ${(+단가val).toLocaleString()}원/kg\n적용일: ${날짜}부터\n\n정말 저장할까요?`)) return;
+
+  try{
+    const res = await fetch(API, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({type:'waste_price', 단가:+단가val, 날짜})
+    });
+    const d = await res.json();
+    if(d.ok === false){ showToast('⚠️ '+d.error); return; }
+  }catch(e){ showToast('⚠️ 저장 실패: '+e.message); return; }
+
+  showToast('✅ 폐유 단가 변경!');
+  document.getElementById('nw-price').value = '';
+  await loadPrices();
+  renderPrices(); // ← patch 버전 renderPrices 명시 호출
+}
+
+async function addPrice(){
+  let 품명 = document.getElementById('np-name')?.value;
+  if(품명 === '_custom') 품명 = document.getElementById('np-custom')?.value.trim();
+  const 구분 = document.getElementById('np-cat')?.value;
+  const 출고가val = document.getElementById('np-val')?.value;
+  const 날짜 = document.getElementById('np-date')?.value;
+  if(!품명 || !출고가val || !날짜){ showToast('필수 항목을 입력해주세요'); return; }
+  const today = new Date().toISOString().slice(0,10);
+  if(날짜 < today){ showToast('⚠️ 과거 날짜는 등록 불가'); return; }
+
+  const latest = (allPrices||[])
+    .filter(p=>p.품명===품명&&p.품명!=='폐유매입단가')
+    .sort((a,b)=>String(b.적용일자).localeCompare(String(a.적용일자)));
+  const curPrice = latest.length > 0 ? (+latest[0].출고가).toLocaleString()+'원' : '없음';
+
+  if(!confirm(`단가 변경\n\n품목: ${품명}\n현재: ${curPrice}\n변경: ${(+출고가val).toLocaleString()}원\n적용일: ${날짜}부터\n\n정말 저장할까요?`)) return;
+
+  try{
+    const res = await fetch(API, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({type:'price', price:{품명, 구분, 출고가:+출고가val, 날짜, 비고:''}})
+    });
+    const d = await res.json();
+    if(d.ok === false){ showToast('⚠️ '+d.error); return; }
+  }catch(e){}
+
+  showToast(`✅ ${품명} 단가 추가!`);
+  document.getElementById('np-val').value = '';
+  await loadPrices();
+  renderPrices(); // ← patch 버전 renderPrices 명시 호출
 }

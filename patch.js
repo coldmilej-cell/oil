@@ -1443,20 +1443,26 @@ function renderCheckinAddBtn(){
   history.insertAdjacentElement('afterend', btn);
 }
 
-// renderCheckinHistory 후처리 — 원본 함수 실행 후 추가 기능
-// (원본은 son.html에 있고, patch.js에서 직접 호출하지 않음)
-// DOMContentLoaded 후에 한 번 실행
-(function patchRenderCheckinHistory(){
-  const orig = typeof renderCheckinHistory === 'function' ? renderCheckinHistory : null;
-  if(!orig) return;
-  window.renderCheckinHistory = function(){
-    orig();
-    const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
-    const empName = typeof EMP !== 'undefined' ? EMP : '';
-    const logs = JSON.parse(localStorage.getItem('checkin_log_' + empName + '_' + t) || '[]');
-    if(logs.length > 0) setTimeout(renderCheckinAddBtn, 100);
-    renderCheckinDaySummary(logs);
-  };
+// ── renderCheckinHistory 추가 기능 (무한루프 없이) ──
+(function safeRCHPatch(){
+  let _done = false;
+  function _patch(){
+    if(_done || typeof renderCheckinHistory !== 'function') return;
+    _done = true;
+    const _orig = renderCheckinHistory;
+    window.renderCheckinHistory = function(){
+      _orig.call(this);
+      try{
+        const _t = typeof today==='function' ? today() : new Date().toISOString().slice(0,10);
+        const _emp = typeof EMP!=='undefined' ? EMP : '';
+        const _logs = JSON.parse(localStorage.getItem('checkin_log_'+_emp+'_'+_t)||'[]');
+        if(_logs.length>0) setTimeout(renderCheckinAddBtn, 100);
+        if(typeof renderCheckinDaySummary==='function') renderCheckinDaySummary(_logs);
+      }catch(e){}
+    };
+  }
+  setTimeout(_patch, 300);
+  document.addEventListener('DOMContentLoaded', ()=>setTimeout(_patch,100));
 })();
 
 function renderCheckinDaySummary(logs){
@@ -1532,3 +1538,146 @@ function checkUrgentAssignments(){
   setTimeout(checkUrgentAssignments, 2000);
   setInterval(checkUrgentAssignments, 30000);
 })();
+
+// ══════════════ getRouteList 오버라이드 — 미배정=공유, 대리납품 ══════════════
+(function patchGetRouteList(){
+  function _patch(){
+    if(typeof getRouteList !== 'function') return;
+    const _orig = getRouteList;
+    window.getRouteList = function(){
+      try{
+        const _cargos = JSON.parse(localStorage.getItem('cargo_today_'+EMP)||'[]');
+        const _t = typeof today==='function' ? today() : new Date().toISOString().slice(0,10);
+        const _day = ['일','월','화','수','목','금','토'][new Date().getDay()];
+        const _skip = JSON.parse(localStorage.getItem('skip_'+EMP+'_'+_t)||'[]');
+        const _st = typeof stores!=='undefined' ? stores : [];
+
+        const dispatched = _st.filter(s=>
+          s.배정상태==='긴급배정' && s.배정날짜===_t &&
+          (s.배정직원===EMP||s.담당===EMP) && s.상태!=='비활성'
+        ).map(s=>s.이름);
+
+        const mine = _st.filter(s=>
+          s.상태!=='비활성' && s.담당===EMP && (!s.요일||s.요일===_day)
+        ).map(s=>s.이름);
+
+        const shared = _st.filter(s=>
+          s.상태!=='비활성' &&
+          (!s.담당||s.담당===''||s.담당==='공유') &&
+          (!s.요일||s.요일===_day)
+        ).map(s=>s.이름);
+
+        const others = _st.filter(s=>
+          s.상태!=='비활성' && s.담당 &&
+          s.담당!==EMP && s.담당!=='공유' && s.요일===_day
+        ).map(s=>s.이름);
+
+        const cargoNames = _cargos.filter(c=>c.거래처).map(c=>c.거래처);
+
+        const all = [...new Set([...dispatched,...cargoNames,...mine,...shared,...others])]
+          .filter(n=>!_skip.includes(n));
+
+        const ordered = [];
+        if(typeof routeOrder!=='undefined'){
+          routeOrder.forEach(n=>{ if(all.includes(n)) ordered.push(n); });
+        }
+        all.forEach(n=>{ if(!ordered.includes(n)) ordered.push(n); });
+        return ordered;
+      }catch(e){
+        return _orig();
+      }
+    };
+  }
+  setTimeout(_patch, 400);
+  document.addEventListener('DOMContentLoaded', ()=>setTimeout(_patch,200));
+})();
+
+// ══════════════ 앱 시작 스플래시 + 동기화 UI ══════════════
+(function initAppSplash(){
+  if(document.getElementById('app-splash')) return;
+
+  const splash = document.createElement('div');
+  splash.id = 'app-splash';
+  splash.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0f1117;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:"Noto Sans KR",sans-serif;transition:opacity .4s ease;';
+  
+  const empName = typeof EMP !== 'undefined' ? EMP : '직원';
+  
+  splash.innerHTML = `
+    <div style="margin-bottom:32px;text-align:center;">
+      <div style="font-size:24px;font-weight:900;color:#e8eaf0;letter-spacing:-.5px;">제이제이컴퍼니</div>
+      <div style="font-size:12px;color:#7a7f94;margin-top:8px;">${empName}</div>
+    </div>
+    <div id="spl-icon" style="width:48px;height:48px;border:3px solid #2a2f3d;border-top-color:#6c8fff;border-radius:50%;animation:splspin .8s linear infinite;margin-bottom:18px;"></div>
+    <div id="spl-msg" style="font-size:14px;color:#7a7f94;font-weight:500;">서버 연결 중...</div>
+    <div id="spl-sub" style="font-size:11px;color:#3a3f52;margin-top:6px;min-height:16px;"></div>
+    <button id="spl-btn" onclick="window._dismissSplash()"
+      style="display:none;margin-top:24px;padding:12px 32px;background:transparent;border:1.5px solid #3a3f52;border-radius:10px;color:#7a7f94;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+      오프라인으로 시작
+    </button>
+    <style>
+      @keyframes splspin{to{transform:rotate(360deg);}}
+      @keyframes splcheck{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
+    </style>`;
+  
+  document.body.appendChild(splash);
+
+  window._dismissSplash = function(){
+    const el = document.getElementById('app-splash');
+    if(!el) return;
+    el.style.opacity = '0';
+    setTimeout(()=>{ el.remove(); }, 400);
+  };
+
+  window._setSplash = function(status, msg, sub){
+    const icon = document.getElementById('spl-icon');
+    const msgEl = document.getElementById('spl-msg');
+    const subEl = document.getElementById('spl-sub');
+    const btn   = document.getElementById('spl-btn');
+    if(msgEl) msgEl.textContent = msg || '';
+    if(subEl) subEl.textContent = sub || '';
+    if(status === 'success'){
+      if(icon){ icon.style.cssText='width:48px;height:48px;'; icon.innerHTML='<svg viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="24" r="21" fill="none" stroke="#3ddc84" stroke-width="3"/><path d="M14 24l7 7 13-13" fill="none" stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'; icon.style.animation='splcheck .35s ease'; }
+      if(msgEl){ msgEl.style.color='#3ddc84'; }
+      if(btn) btn.style.display='none';
+      setTimeout(window._dismissSplash, 900);
+    } else if(status === 'offline'){
+      if(icon){ icon.style.cssText='width:48px;height:48px;font-size:36px;text-align:center;line-height:48px;'; icon.textContent='📴'; }
+      if(msgEl){ msgEl.textContent='오프라인 모드'; msgEl.style.color='#ff9f43'; }
+      if(subEl) subEl.textContent = sub || '저장된 데이터로 시작합니다';
+      if(btn) btn.style.display='block';
+    } else if(status === 'error'){
+      if(icon){ icon.style.cssText='width:48px;height:48px;font-size:36px;text-align:center;line-height:48px;'; icon.textContent='⚠️'; }
+      if(msgEl){ msgEl.style.color='#ff6b6b'; }
+      if(btn) btn.style.display='block';
+    }
+  };
+
+  // 10초 후 자동으로 오프라인 버튼 표시
+  setTimeout(()=>{
+    const btn = document.getElementById('spl-btn');
+    if(btn && btn.style.display==='none'){
+      btn.style.display='block';
+      const sub = document.getElementById('spl-sub');
+      if(sub) sub.textContent='연결이 오래 걸리고 있어요';
+    }
+  }, 10000);
+})();
+
+// ── init 오버라이드 — 스플래시 연동 ──
+const _origInitSplash = typeof init === 'function' ? init : null;
+
+async function init(){
+  if(typeof window._setSplash === 'function') window._setSplash('loading', '서버 연결 중...');
+  try{
+    if(_origInitSplash) await _origInitSplash();
+    if(typeof window._setSplash === 'function') window._setSplash('success', '동기화 완료');
+  }catch(e){
+    const offline = !navigator.onLine || (e.message||'').includes('timed out') || (e.message||'').includes('fetch');
+    if(typeof window._setSplash === 'function'){
+      window._setSplash(offline ? 'offline' : 'error', offline ? '오프라인 모드' : '연결 실패', (e.message||'').slice(0,50));
+    }
+    // 에러여도 로컬 데이터로 계속 실행
+    try{ if(typeof renderRoute==='function') renderRoute(); }catch(e2){}
+    try{ if(typeof renderPriceTab==='function') renderPriceTab(); }catch(e2){}
+  }
+}

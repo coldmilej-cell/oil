@@ -130,6 +130,21 @@ select option{background:#161b22;}
 </style>
 </head>
 <body>
+
+<div id="boss-splash" style="position:fixed;inset:0;z-index:99998;background:#0f1117;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:'Noto Sans KR',sans-serif;transition:opacity .4s ease;">
+  <div style="margin-bottom:32px;text-align:center;">
+    <div style="font-size:24px;font-weight:900;color:#e8eaf0;">제이제이컴퍼니</div>
+    <div style="font-size:12px;color:#7a7f94;margin-top:8px;letter-spacing:.05em;">사장 관리 시스템</div>
+  </div>
+  <div id="bspl-icon" style="width:48px;height:48px;border:3px solid #2a2f3d;border-top-color:#6c8fff;border-radius:50%;animation:bspin .8s linear infinite;margin-bottom:18px;"></div>
+  <div id="bspl-msg" style="font-size:14px;color:#7a7f94;font-weight:500;">서버 연결 중...</div>
+  <div id="bspl-sub" style="font-size:11px;color:#3a3f52;margin-top:6px;min-height:16px;"></div>
+  <button id="bspl-btn" onclick="dismissBossSplash()"
+    style="display:none;margin-top:24px;padding:12px 32px;background:transparent;border:1.5px solid #3a3f52;border-radius:10px;color:#7a7f94;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+    오프라인으로 시작
+  </button>
+  <style>@keyframes bspin{to{transform:rotate(360deg);}}</style>
+</div>
 <div class="tabs">
   <div class="tab on"  onclick="goTab('dashboard')">📊 현황</div>
   <div class="tab"     onclick="goTab('history')">📋 내역</div>
@@ -272,10 +287,17 @@ select option{background:#161b22;}
           <div id="dispatch-dd" style="position:absolute;top:100%;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:9px;z-index:100;max-height:160px;overflow-y:auto;display:none;margin-top:2px;"></div>
         </div>
         <!-- 직원 선택 -->
-        <select id="dispatch-emp" style="background:var(--card2);border:1.5px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;min-width:90px;">
-          <option value="손호영">손호영</option>
-          <option value="박기빈">박기빈</option>
-        </select>
+        <div style="display:flex;gap:5px;">
+          <div id="dbtn-손호영" onclick="selectDispatchEmp('손호영')"
+            style="flex:1;padding:9px 8px;text-align:center;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">
+            손호영
+          </div>
+          <div id="dbtn-박기빈" onclick="selectDispatchEmp('박기빈')"
+            style="flex:1;padding:9px 8px;text-align:center;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">
+            박기빈
+          </div>
+        </div>
+        <input type="hidden" id="dispatch-emp" value="">
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
         <span id="dispatch-new-badge" style="display:none;font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,159,67,.12);color:var(--o);font-weight:700;">🆕 신규 거래처</span>
@@ -636,16 +658,16 @@ function toggleDay(id){document.getElementById(id).classList.toggle('show');}
 
 // ===== 자동배정 =====
 function updateAssignStats(){
-  if(!allStores || !allStores.length) return;
+  if(!allStores||!allStores.length) return;
   const son=allStores.filter(s=>s.담당==='손호영').length;
   const bak=allStores.filter(s=>s.담당==='박기빈').length;
   const none=allStores.filter(s=>!s.담당||s.담당==='공유').length;
-  const sonEl=document.getElementById('as-son');
-  const bakEl=document.getElementById('as-bak');
-  const noneEl=document.getElementById('as-none');
-  if(sonEl) sonEl.textContent=son;
-  if(bakEl) bakEl.textContent=bak;
-  if(noneEl) noneEl.textContent=none;
+  const e1=document.getElementById('as-son');
+  const e2=document.getElementById('as-bak');
+  const e3=document.getElementById('as-none');
+  if(e1) e1.textContent=son;
+  if(e2) e2.textContent=bak;
+  if(e3) e3.textContent=none;
 }
 
 async function runAutoAssign(){
@@ -1768,5 +1790,47 @@ function renderDispatchList(){
 document.addEventListener('DOMContentLoaded', () => setTimeout(initDispatch, 500));
 
 </script>
+<script>
+function dismissBossSplash(){
+  const el=document.getElementById('boss-splash');
+  if(!el)return;
+  el.style.opacity='0';
+  setTimeout(()=>el.remove(),400);
+}
+function setBossSplash(status,msg,sub){
+  const icon=document.getElementById('bspl-icon');
+  const msgEl=document.getElementById('bspl-msg');
+  const subEl=document.getElementById('bspl-sub');
+  const btn=document.getElementById('bspl-btn');
+  if(msgEl)msgEl.textContent=msg||'';
+  if(subEl)subEl.textContent=sub||'';
+  if(status==='success'){
+    if(icon){icon.style.cssText='width:48px;height:48px;';icon.innerHTML='<svg viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="24" r="21" fill="none" stroke="#3ddc84" stroke-width="3"/><path d="M14 24l7 7 13-13" fill="none" stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>';}
+    if(msgEl)msgEl.style.color='#3ddc84';
+    setTimeout(dismissBossSplash,900);
+  }else if(status==='offline'||status==='error'){
+    if(icon){icon.style.cssText='width:48px;height:48px;font-size:36px;text-align:center;line-height:48px;';icon.textContent='📴';}
+    if(msgEl){msgEl.textContent=msg||'오프라인 모드';msgEl.style.color='#ff9f43';}
+    if(btn)btn.style.display='block';
+  }
+}
+const _bOrigLoadAll = typeof loadAll==='function' ? loadAll : null;
+async function loadAll(){
+  setBossSplash('loading','서버 연결 중...');
+  try{
+    if(_bOrigLoadAll) await _bOrigLoadAll();
+    setBossSplash('success','동기화 완료');
+  }catch(e){
+    setBossSplash('offline','오프라인 모드','저장된 데이터로 시작합니다');
+  }
+}
+setTimeout(()=>{
+  const btn=document.getElementById('bspl-btn');
+  if(btn&&btn.style.display==='none'){
+    btn.style.display='block';
+    const sub=document.getElementById('bspl-sub');
+    if(sub)sub.textContent='연결이 오래 걸리고 있어요';
+  }
+},10000);</script>
 </body>
 </html>

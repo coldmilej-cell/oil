@@ -277,6 +277,9 @@ select option{background:#161b22;}
           <option value="박기빈">박기빈</option>
         </select>
       </div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+        <span id="dispatch-new-badge" style="display:none;font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,159,67,.12);color:var(--o);font-weight:700;">🆕 신규 거래처</span>
+      </div>
       <button onclick="addDispatch()"
         style="width:100%;padding:10px;background:var(--p2);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
         + 배차 추가
@@ -1618,20 +1621,35 @@ function onDispatchSearch(){
   const list = q
     ? allStores.filter(s => s.이름.includes(q) || (s.입금자||'').includes(q))
     : allStores.filter(s => s.상태 !== '비활성').slice(0, 20);
-  dd.innerHTML = list.map(s => `
+
+  let html = list.map(s => `
     <div style="padding:9px 13px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;"
-      onmousedown="selectDispatchStore('${s.이름.replace(/'/g,"\'")}')">
+      onmousedown="selectDispatchStore('${s.이름.replace(/'/g,"\'")}', true)">
       ${s.이름}
       <span style="font-size:10px;color:var(--t2);margin-left:6px;">${s.담당||'공유'} · ${s.요일||''}</span>
-    </div>`).join('') || '<div style="padding:9px 13px;font-size:12px;color:var(--t2);">검색 결과 없음</div>';
+    </div>`).join('');
+
+  // 검색어가 있고 기존 거래처에 없으면 신규 직접입력 옵션 표시
+  if(q && !allStores.find(s => s.이름 === q)){
+    html += `
+    <div style="padding:9px 13px;cursor:pointer;font-size:13px;color:var(--g);border-top:1px solid var(--border);"
+      onmousedown="selectDispatchStore('${q.replace(/'/g,"\'")}', false)">
+      ➕ "${q}" 신규 배차 (미등록 거래처)
+    </div>`;
+  }
+
+  dd.innerHTML = html || '<div style="padding:9px 13px;font-size:12px;color:var(--t2);">검색 결과 없음</div>';
   dd.style.display = 'block';
 }
 
-function selectDispatchStore(name){
+function selectDispatchStore(name, isExisting){
   const el = document.getElementById('dispatch-store-q');
   if(el) el.value = name;
   const dd = document.getElementById('dispatch-dd');
   if(dd) dd.style.display = 'none';
+  // 신규거래처면 표시
+  const badge = document.getElementById('dispatch-new-badge');
+  if(badge) badge.style.display = isExisting ? 'none' : 'inline-block';
 }
 
 async function addDispatch(){
@@ -1652,13 +1670,14 @@ async function addDispatch(){
     직원: empName,
     날짜: t,
     시간: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}),
-    완료: false
+    완료: false,
+    isNew: !allStores.find(x => x.이름 === storeName)
   };
 
   dispatchList.push(dispatch);
   localStorage.setItem('dispatch_today_v1', JSON.stringify(dispatchList));
 
-  // GAS에 배차 정보 저장 (직원앱이 싱크로 받아감)
+  // 기존 거래처면 배정상태 업데이트
   const s = allStores.find(x => x.이름 === storeName);
   if(s){
     s.배정상태 = '긴급배정';
@@ -1674,11 +1693,42 @@ async function addDispatch(){
         })
       });
     }catch(e){}
+  } else {
+    // 신규거래처 — 임시 등록 후 배차
+    const maxCode = allStores.reduce((m,s) => Math.max(m, parseInt((s.코드||'C000').replace('C',''))||0), 0);
+    const newStore = {
+      코드: `C${String(maxCode+1).padStart(3,'0')}`,
+      이름: storeName,
+      담당: empName,
+      요일: '',
+      유종: '',
+      연락처: '',
+      입금자: '',
+      비고: '',
+      미수한도: 0,
+      상태: '활성',
+      배정상태: '긴급배정',
+      배정직원: empName,
+      배정날짜: t,
+      지사: '본사',
+    };
+    allStores.push(newStore);
+    try{
+      await fetch(API, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain'},
+        body: JSON.stringify({ type: 'store_add', store: newStore })
+      });
+    }catch(e){}
+    showToast(`🆕 ${storeName} 신규 등록 + 배차 완료`);
   }
 
+  // 배지 숨기기
+  const badge = document.getElementById('dispatch-new-badge');
+  if(badge) badge.style.display = 'none';
   document.getElementById('dispatch-store-q').value = '';
   renderDispatchList();
-  showToast(`✅ ${storeName} → ${empName} 배차 완료`);
+  if(s) showToast(`✅ ${storeName} → ${empName} 배차 완료`);
 }
 
 function removeDispatch(idx){
@@ -1699,6 +1749,7 @@ function renderDispatchList(){
       <div>
         <div style="font-size:13px;font-weight:700;">${d.거래처}
           <span style="font-size:9px;padding:2px 6px;border-radius:10px;margin-left:4px;background:rgba(61,220,132,.12);color:var(--g);">${d.직원}</span>
+          ${d.isNew ? '<span style="font-size:9px;padding:2px 6px;border-radius:10px;margin-left:2px;background:rgba(255,159,67,.12);color:var(--o);">신규</span>' : ''}
         </div>
         <div style="font-size:10px;color:var(--t2);margin-top:2px;">${d.시간} 배차</div>
       </div>

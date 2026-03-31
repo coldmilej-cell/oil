@@ -213,6 +213,8 @@ function renderRoute(){
       <div class="drag-handle" draggable="true" ondragstart="dragStart(event,'${name}')" ondragover="dragOver(event)" ondrop="dragDrop(event,'${name}')" ondragend="dragEnd(event)">⠿</div>
     </div>`;
   }).join('');
+
+  if(typeof updateDailyBar==='function') updateDailyBar();
 }
 
 // ══════════════ saveDelivery 오버라이드 (완료 애니메이션 추가) ══════════════
@@ -1454,7 +1456,9 @@ async function saveInlineDelivery(name, idx){
   if(!completedRoutes.includes(name)) completedRoutes.push(name);
   localStorage.setItem(`done_${EMP}_${t}`, JSON.stringify(completedRoutes));
 
-  // 현금/폐유 자동 입금
+  // 현금/폐유 자동 
+  const _aidx = (typeof getRouteList==='function') ? getRouteList().indexOf(name) : -1;
+  if(_aidx >= 0) setTimeout(()=>{ if(typeof playDoneAnimation==='function') playDoneAnimation(_aidx); }, 80);입금
   const s = stores.find(x=>x.이름===name);
   if(pay==='현금'&&payAmt>0)
     await savePayment({거래처:name,금액:payAmt,날짜:t,입금자명:s?.입금자||name,방법:'현금',비고:'현장현금수령'});
@@ -1701,3 +1705,27 @@ function checkUrgentAssignments(){
 })();
 
 
+
+// ══════════════ 납품 완료 애니메이션 ══════════════
+function playDoneAnimation(idx){
+  const card = document.getElementById('ri-' + idx);
+  if(!card) return;
+
+  // 완료 오버레이
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:absolute;inset:0;border-radius:12px;background:rgba(61,220,132,.15);display:flex;align-items:center;justify-content:center;z-index:10;pointer-events:none;animation:doneFlash .6s ease forwards;';
+  overlay.innerHTML = '<div style="font-size:32px;animation:donePop .4s ease;">✅</div>';
+  card.style.position = 'relative';
+  card.appendChild(overlay);
+
+  setTimeout(()=>{ overlay.remove(); }, 700);
+}
+
+// CSS 애니메이션 한번만 추가
+(function addDoneCSS(){
+  if(document.getElementById('done-anim-css')) return;
+  const style = document.createElement('style');
+  style.id = 'done-anim-css';
+  style.textContent = '@keyframes doneFlash{0%{opacity:0}30%{opacity:1}70%{opacity:1}100%{opacity:0}}@keyframes donePop{0%{transform:scale(.3)}60%{transform:scale(1.3)}100%{transform:scale(1)}}';
+  document.head.appendChild(style);
+})();

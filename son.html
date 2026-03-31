@@ -493,14 +493,16 @@ select option{background:#181c24;}
       <div style="font-size:11px;color:var(--t3)" id="hist-month-label"></div>
     </div>
   </div>
-  <!-- 날짜 선택 -->
-  <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
-    <input type="month" id="hist-month-sel"
-      style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
-      onchange="onHistMonthChange()">
+  <!-- 날짜 선택 — 통합 -->
+  <div style="margin-bottom:10px;">
     <input type="date" id="hist-date-sel"
-      style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
+      style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--t);font-size:14px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;-webkit-appearance:none;"
       onchange="onHistDateChange()">
+    <div style="display:flex;gap:6px;margin-top:6px;">
+      <button onclick="histGoMonth(-1)" style="flex:1;padding:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">◀ 이전달</button>
+      <button onclick="histGoToday()" style="flex:1;padding:8px;background:rgba(108,143,255,.1);border:1px solid var(--p);border-radius:8px;color:var(--p);font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">오늘</button>
+      <button onclick="histGoMonth(1)" style="flex:1;padding:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">다음달 ▶</button>
+    </div>
   </div>
   <!-- 명세서 일괄 발송 버튼 -->
   <div id="batch-receipt-wrap" style="display:none;margin-bottom:10px">
@@ -2376,29 +2378,35 @@ function getSentMap(){ return JSON.parse(localStorage.getItem(SENT_KEY)||'{}'); 
 function markSent(txId){ const m=getSentMap(); m[txId]=new Date().toISOString(); localStorage.setItem(SENT_KEY,JSON.stringify(m)); }
 function isSent(txId){ return !!getSentMap()[txId]; }
 
-function onHistMonthChange(){
-  // 월 선택 시 일 선택 초기화
-  document.getElementById('hist-date-sel').value='';
-  renderHistory();
-}
 function onHistDateChange(){
-  // 일 선택 시 월을 맞게 업데이트
-  const d=document.getElementById('hist-date-sel').value;
-  if(d){
-    const m=d.slice(0,7);
-    document.getElementById('hist-month-sel').value=m;
-  }
   renderHistory();
 }
+function histGoToday(){
+  const el=document.getElementById('hist-date-sel');
+  if(el){ el.value=new Date().toISOString().slice(0,10); renderHistory(); }
+}
+function histGoMonth(dir){
+  const el=document.getElementById('hist-date-sel');
+  if(!el) return;
+  const cur=el.value||new Date().toISOString().slice(0,10);
+  const d=new Date(cur);
+  d.setMonth(d.getMonth()+dir);
+  el.value=d.toISOString().slice(0,10);
+  renderHistory();
+}
+function onHistMonthChange(){ renderHistory(); }
 
 async function renderHistory(){
   const now=new Date();
   const defaultMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const selEl=document.getElementById('hist-month-sel');
   const dateEl=document.getElementById('hist-date-sel');
-  if(selEl&&!selEl.value) selEl.value=defaultMonth;
-  const month=selEl?.value||defaultMonth;
-  const filterDate=dateEl?.value||''; // 특정 날짜 필터
+  // 날짜 선택된 경우: 해당 월 표시 / 없으면 이번달
+  const filterDate=dateEl?.value||'';
+  const month=filterDate?filterDate.slice(0,7):defaultMonth;
+  if(dateEl&&!dateEl.value){
+    // 기본값: 오늘
+    dateEl.value=new Date().toISOString().slice(0,10);
+  }
   const [yy,mm]=month.split('-');
   const el=document.getElementById('history-list');
   el.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3)">⏳ 불러오는 중...</div>';

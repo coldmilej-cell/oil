@@ -765,6 +765,7 @@ async function loadStores(){
 }
 
 async function loadDashboard(){
+  try{
   // 마감 여부 체크
   const _dm = document.getElementById('dash-month')?.value;
   if(_dm){
@@ -788,11 +789,8 @@ async function loadDashboard(){
   allPayments=pr.rows||[];
   allWaste=wr.rows||[];
   renderDashboard();
+  }catch(e){ console.warn('loadDashboard 실패',e); renderDashboard(); }
 }
-
-let curSubTab='tx';
-let histPayments=[], histWaste=[];
-
 async function loadHistoryAll(){
   let month=document.getElementById('hist-month')?.value;
   if(!month) month=document.getElementById('dash-month')?.value;

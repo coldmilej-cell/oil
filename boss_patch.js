@@ -261,10 +261,11 @@ function goTab(t){
     loadAccounts();
   }
   if(t==='history'){
+    injectHistoryUI();
     const hm=document.getElementById('hist-month');
     const dm=document.getElementById('dash-month')?.value||'';
     if(hm&&!hm.value) hm.value=dm;
-    loadHistoryAll();
+    loadHistoryUnified(hm?.value||dm);
   }
   if(t==='stores'){
     // 비활성 필터 버튼 추가 (없으면)
@@ -281,13 +282,6 @@ function goTab(t){
   }
   if(t==='prices'){
     loadPrices().then(()=>renderPrices());
-  }
-  if(t==='history'){
-    injectHistoryUI();
-    const hm = document.getElementById('hist-month');
-    const dm = document.getElementById('dash-month')?.value || '';
-    if(hm && !hm.value) hm.value = dm;
-    loadHistoryUnified(hm?.value || dm);
   }
 }
 
@@ -663,6 +657,42 @@ function renderPrices(){
     setTimeout(apply, 100);
   } else {
     document.addEventListener('DOMContentLoaded', () => setTimeout(apply, 100));
+  }
+})();
+
+// ══════════════ DOM 직접 수정 (HTML 원본 문제 JS에서 해결) ══════════════
+(function fixDOMIssues(){
+  const fix = () => {
+    // 1. 이전단가 수정버튼 숨기기 (HTML에서 제거 전까지)
+    const prevEditBtns = document.querySelectorAll('[onclick*="openEditWaste(1)"]');
+    prevEditBtns.forEach(btn => btn.style.display = 'none');
+
+    // 2. 현재단가 수정버튼 id 추가 (없으면)
+    const editBtns = document.querySelectorAll('[onclick*="openEditWaste(0)"]');
+    editBtns.forEach(btn => { if(!btn.id) btn.id = 'waste-edit-btn'; });
+
+    // 3. renderStores의 삭제버튼 숨기기 (HTML 원본의 renderStores 결과)
+    // boss_patch.js의 renderStores 오버라이드가 이미 삭제버튼 없이 렌더링하므로 불필요
+    // 단, 초기 로드 시 원본 renderStores가 먼저 실행될 수 있어 한번만 정리
+    document.querySelectorAll('.store-card .btn-danger').forEach(btn => {
+      if(btn.textContent.trim() === '삭제') btn.style.display = 'none';
+    });
+
+    // 4. 내역탭 원본 서브탭 숨기기 (boss_patch.js injectHistoryUI 전에 보이는 경우)
+    const subTabs = document.querySelectorAll('.sub-tab');
+    subTabs.forEach(el => el.style.display = 'none');
+
+    // 5. 힌트 텍스트 업데이트
+    const hint = document.querySelector('.hint');
+    if(hint && hint.textContent.includes('수정/삭제 불가')){
+      hint.textContent = '단가는 추가만 가능 → 과거 거래 마진 자동 보호 · 폐유단가는 오늘것만 수정 가능';
+    }
+  };
+
+  if(document.readyState === 'complete' || document.readyState === 'interactive'){
+    setTimeout(fix, 150);
+  } else {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(fix, 150));
   }
 })();
 

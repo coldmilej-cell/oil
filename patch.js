@@ -468,6 +468,9 @@ async function init(){
   const now=new Date();
   document.getElementById('ci-date').textContent=`${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')} (${['일','월','화','수','목','금','토'][now.getDay()]})`;
   document.getElementById('delivery-day-label').textContent=`${['일','월','화','수','목','금','토'][now.getDay()]}요일 루트`;
+  // hist-month-label 안전하게 처리 (HTML에 없는 경우 대비)
+  const ym=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const hml=document.getElementById('hist-month-label'); if(hml) hml.textContent=ym;
 
   try{
     const fetchOpts={signal:AbortSignal.timeout?AbortSignal.timeout(8000):undefined};

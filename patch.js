@@ -1490,7 +1490,7 @@ async function saveInlineDelivery(name, idx){
   if(!completedRoutes.includes(name)) completedRoutes.push(name);
   localStorage.setItem(`done_${EMP}_${t}`, JSON.stringify(completedRoutes));
 
-  // 현금/폐유 자동 
+  // 현금/폐유 자동 입금
   const _aidx = (typeof getRouteList==='function') ? getRouteList().indexOf(name) : -1;
   if(_aidx >= 0) setTimeout(()=>{ if(typeof playDoneAnimation==='function') playDoneAnimation(_aidx); }, 80);
 

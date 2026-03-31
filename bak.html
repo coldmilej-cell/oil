@@ -835,8 +835,25 @@ function buildPayStore(){} // 검색방식으로 변경
 function goTab(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',['checkin','delivery','payment','history','prices'][i]===t));
   document.querySelectorAll('.page').forEach((el,i)=>el.classList.toggle('on',['page-checkin','page-delivery','page-payment','page-history','page-prices'][i]===`page-${t}`));
-  if(t==='delivery'){hideDeliveryForm();renderRoute();document.getElementById('daily-bar').style.display='block';}
-  else{document.getElementById('daily-bar').style.display='none';}
+  if(t==='delivery'){
+    // delivery-form 닫기 + route-section 강제 복원
+    const rf = document.getElementById('delivery-form');
+    const rs = document.getElementById('route-section');
+    if(rf) rf.style.display='none';
+    if(rs) rs.style.display='block';
+    // 인라인 폼 모두 닫기
+    document.querySelectorAll('.inline-delivery-form').forEach(f=>f.remove());
+    hideDeliveryForm();
+    renderRoute();
+    document.getElementById('daily-bar').style.display='block';
+  }
+  else{
+    document.getElementById('daily-bar').style.display='none';
+    // 납품폼이 열려있으면 닫기 (탭 이동 시 자동 닫힘)
+    const rf2 = document.getElementById('delivery-form');
+    const rs2 = document.getElementById('route-section');
+    if(rf2 && rf2.style.display!=='none'){ rf2.style.display='none'; if(rs2) rs2.style.display='block'; }
+  }
   if(t==='payment'){renderTodayPayments();calcSettlement();renderMonthlySettle();}
   if(t==='history')renderHistory();
   if(t==='prices')renderPriceTab();

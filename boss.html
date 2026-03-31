@@ -276,34 +276,69 @@ select option{background:#161b22;}
 
     <!-- 배차 입력 -->
     <div id="dispatch-form" style="margin-bottom:10px;">
-      <div style="display:flex;gap:6px;margin-bottom:6px;">
-        <!-- 거래처 검색 -->
+
+      <!-- 거래처 검색 + 직원 선택 -->
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
         <div style="flex:1;position:relative;">
-          <input type="text" id="dispatch-store-q" placeholder="거래처 검색..."
+          <input type="text" id="dispatch-store-q" placeholder="거래처 검색 또는 신규 입력..."
             style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
             oninput="onDispatchSearch()" onfocus="onDispatchSearch()"
             onblur="setTimeout(()=>document.getElementById('dispatch-dd').style.display='none',150)"
             autocomplete="off">
           <div id="dispatch-dd" style="position:absolute;top:100%;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:9px;z-index:100;max-height:160px;overflow-y:auto;display:none;margin-top:2px;"></div>
         </div>
-        <!-- 직원 선택 -->
         <div style="display:flex;gap:5px;">
           <div id="dbtn-손호영" onclick="selectDispatchEmp('손호영')"
-            style="flex:1;padding:9px 8px;text-align:center;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">
+            style="padding:9px 10px;text-align:center;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;white-space:nowrap;">
             손호영
           </div>
           <div id="dbtn-박기빈" onclick="selectDispatchEmp('박기빈')"
-            style="flex:1;padding:9px 8px;text-align:center;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">
+            style="padding:9px 10px;text-align:center;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;white-space:nowrap;">
             박기빈
           </div>
         </div>
         <input type="hidden" id="dispatch-emp" value="">
       </div>
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-        <span id="dispatch-new-badge" style="display:none;font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,159,67,.12);color:var(--o);font-weight:700;">🆕 신규 거래처</span>
+
+      <!-- 거래처 정보 수정 패널 (선택 시 표시) -->
+      <div id="dispatch-info-panel" style="display:none;background:var(--card2);border:1.5px solid var(--p);border-radius:10px;padding:12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:700;color:var(--p);" id="dispatch-panel-label">거래처 정보</div>
+          <div id="dispatch-new-badge" style="display:none;font-size:10px;background:rgba(61,220,132,.15);color:var(--g);border:1px solid var(--g);border-radius:6px;padding:2px 7px;font-weight:700;">🆕 신규</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div>
+            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">유종</div>
+            <input type="text" id="dispatch-유종"
+              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+              placeholder="예: 하이골드">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">방문요일</div>
+            <select id="dispatch-요일"
+              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;-webkit-appearance:none;">
+              <option value="">없음</option>
+              <option>월</option><option>화</option><option>수</option>
+              <option>목</option><option>금</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">연락처</div>
+            <input type="text" id="dispatch-연락처"
+              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+              placeholder="010-0000-0000">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">입금자명</div>
+            <input type="text" id="dispatch-입금자"
+              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+              placeholder="통장에 찍히는 이름">
+          </div>
+        </div>
       </div>
+
       <button onclick="addDispatch()"
-        style="width:100%;padding:10px;background:var(--p2);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+        style="width:100%;padding:11px;background:var(--p2);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
         + 배차 추가
       </button>
     </div>
@@ -479,7 +514,9 @@ async function loadAll(){
   showToast('📡 불러오는 중...');
   if(typeof setBossSplash === 'function') setBossSplash('loading', '서버 연결 중...');
   try{
+    // stores/prices 먼저 (dashboard에 필요)
     await Promise.all([loadMonths(), loadPrices(), loadStores()]);
+    // dashboard는 stores 로드 후 실행 (미수 계산 등)
     await loadDashboard();
     updateAssignStats();
     showToast('✅ 완료!');
@@ -487,6 +524,8 @@ async function loadAll(){
   }catch(e){
     showToast('⚠️ 연결 실패');
     if(typeof setBossSplash === 'function') setBossSplash('offline', '오프라인 모드', '저장된 데이터로 시작합니다');
+    // 에러여도 로컬 데이터로 진입
+    try{ renderDashboard(); }catch(e2){}
   }
 }
 
@@ -1645,6 +1684,36 @@ function initDispatch(){
   renderDispatchList();
 }
 
+
+function selectDispatchStore(name){
+  const el = document.getElementById('dispatch-store-q');
+  if(el) el.value = name;
+  document.getElementById('dispatch-dd').style.display = 'none';
+
+  // 정보 패널 표시 + 기존 데이터 채우기
+  const panel = document.getElementById('dispatch-info-panel');
+  const newBadge = document.getElementById('dispatch-new-badge');
+  const label = document.getElementById('dispatch-panel-label');
+  panel.style.display = 'block';
+
+  const s = allStores.find(x => x.이름 === name);
+  if(s){
+    document.getElementById('dispatch-유종').value = s.유종 || '';
+    document.getElementById('dispatch-요일').value = s.요일 || '';
+    document.getElementById('dispatch-연락처').value = s.연락처 || '';
+    document.getElementById('dispatch-입금자').value = s.입금자 || '';
+    if(newBadge) newBadge.style.display = 'none';
+    if(label) label.textContent = `${name} — 수정 후 배차`;
+  } else {
+    // 신규
+    document.getElementById('dispatch-유종').value = '';
+    document.getElementById('dispatch-요일').value = '';
+    document.getElementById('dispatch-연락처').value = '';
+    document.getElementById('dispatch-입금자').value = '';
+    if(newBadge) newBadge.style.display = 'block';
+    if(label) label.textContent = `신규 거래처 — 정보 입력 후 등록`;
+  }
+}
 function onDispatchSearch(){
   const q = (document.getElementById('dispatch-store-q')?.value || '').trim();
   const dd = document.getElementById('dispatch-dd');
@@ -1686,58 +1755,63 @@ function selectDispatchStore(name, isExisting){
 async function addDispatch(){
   const storeName = document.getElementById('dispatch-store-q')?.value?.trim();
   const empName = document.getElementById('dispatch-emp')?.value;
-  if(!storeName){ showToast('거래처를 선택해주세요'); return; }
+  const 유종 = document.getElementById('dispatch-유종')?.value?.trim() || '';
+  const 요일 = document.getElementById('dispatch-요일')?.value || '';
+  const 연락처 = document.getElementById('dispatch-연락처')?.value?.trim() || '';
+  const 입금자 = document.getElementById('dispatch-입금자')?.value?.trim() || '';
+
+  if(!storeName){ showToast('거래처를 선택하거나 입력해주세요'); return; }
   if(!empName){ showToast('직원을 선택해주세요'); return; }
 
   const t = new Date().toISOString().slice(0,10);
 
-  // 중복 체크
   if(dispatchList.find(d => d.거래처 === storeName && d.직원 === empName)){
     showToast('이미 배차됐어요'); return;
   }
 
-  const dispatch = {
-    거래처: storeName,
-    직원: empName,
-    날짜: t,
-    시간: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}),
-    완료: false,
-    isNew: !allStores.find(x => x.이름 === storeName)
-  };
+  const existingStore = allStores.find(x => x.이름 === storeName);
+  const isNew = !existingStore;
 
+  const dispatch = {
+    거래처: storeName, 직원: empName, 날짜: t,
+    시간: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}),
+    완료: false, isNew
+  };
   dispatchList.push(dispatch);
   localStorage.setItem('dispatch_today_v1', JSON.stringify(dispatchList));
 
-  // 기존 거래처면 배정상태 업데이트
-  const s = allStores.find(x => x.이름 === storeName);
-  if(s){
-    s.배정상태 = '긴급배정';
-    s.배정직원 = empName;
-    s.배정날짜 = t;
+  if(!isNew){
+    // 기존 거래처 — 정보 업데이트 + 배정
+    const updateData = {
+      이름: storeName,
+      배정상태: '긴급배정',
+      배정직원: empName,
+      배정날짜: t,
+    };
+    if(유종) updateData.유종 = 유종;
+    if(요일) updateData.요일 = 요일;
+    if(연락처) updateData.연락처 = 연락처;
+    if(입금자) updateData.입금자 = 입금자;
+
+    // 로컬 allStores 업데이트
+    Object.assign(existingStore, updateData);
+
     try{
       await fetch(API, {
-        method: 'POST',
-        headers: {'Content-Type': 'text/plain'},
-        body: JSON.stringify({
-          type: 'store_update',
-          store: {이름: storeName, 배정상태: '긴급배정', 배정직원: empName, 배정날짜: t}
-        })
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({type:'store_update', store: updateData})
       });
     }catch(e){}
+    showToast(`✅ ${storeName} → ${empName} 배차 완료`);
   } else {
-    // 신규거래처 — 임시 등록 후 배차
+    // 신규 거래처 — 등록 + 배차
     const maxCode = allStores.reduce((m,s) => Math.max(m, parseInt((s.코드||'C000').replace('C',''))||0), 0);
     const newStore = {
       코드: `C${String(maxCode+1).padStart(3,'0')}`,
       이름: storeName,
       담당: empName,
-      요일: '',
-      유종: '',
-      연락처: '',
-      입금자: '',
-      비고: '',
-      미수한도: 0,
-      상태: '활성',
+      요일, 유종, 연락처, 입금자,
+      비고: '', 미수한도: 0, 상태: '활성',
       배정상태: '긴급배정',
       배정직원: empName,
       배정날짜: t,
@@ -1746,20 +1820,26 @@ async function addDispatch(){
     allStores.push(newStore);
     try{
       await fetch(API, {
-        method: 'POST',
-        headers: {'Content-Type': 'text/plain'},
-        body: JSON.stringify({ type: 'store_add', store: newStore })
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({type:'store_add', store: newStore})
       });
     }catch(e){}
-    showToast(`🆕 ${storeName} 신규 등록 + 배차 완료`);
+    showToast(`🆕 ${storeName} 신규 등록 + ${empName} 배차 완료`);
   }
 
-  // 배지 숨기기
-  const badge = document.getElementById('dispatch-new-badge');
-  if(badge) badge.style.display = 'none';
+  // 폼 초기화
   document.getElementById('dispatch-store-q').value = '';
+  document.getElementById('dispatch-emp').value = '';
+  document.getElementById('dispatch-유종').value = '';
+  document.getElementById('dispatch-요일').value = '';
+  document.getElementById('dispatch-연락처').value = '';
+  document.getElementById('dispatch-입금자').value = '';
+  document.getElementById('dispatch-info-panel').style.display = 'none';
+  ['dbtn-손호영','dbtn-박기빈'].forEach(id=>{
+    const b = document.getElementById(id);
+    if(b){ b.style.borderColor='var(--border)'; b.style.background='var(--card2)'; b.style.color='var(--t2)'; }
+  });
   renderDispatchList();
-  if(s) showToast(`✅ ${storeName} → ${empName} 배차 완료`);
 }
 
 function removeDispatch(idx){

@@ -1,111 +1,8 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // © 2025 제이제이컴퍼니 (JJ Company)
 // Oil Distribution Management System v3.0
+// All rights reserved. Unauthorized use prohibited.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-// ══════════════ 즉시 스플래시 (patch.js 로드 즉시) ══════════════
-// son.html의 init()이 먼저 실행되므로
-// patch.js 로드되자마자 스플래시 표시 + init 결과 감시
-(function patchInitAndSplash(){
-  // 스플래시 즉시 생성
-  if(!document.getElementById('app-splash')){
-    const splash = document.createElement('div');
-    splash.id = 'app-splash';
-    splash.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0f1117;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:"Noto Sans KR",sans-serif;transition:opacity .4s ease;';
-    const empName = typeof EMP !== 'undefined' ? EMP : '직원';
-    splash.innerHTML = `
-      <div style="margin-bottom:32px;text-align:center;">
-        <div style="font-size:24px;font-weight:900;color:#e8eaf0;">제이제이컴퍼니</div>
-        <div style="font-size:12px;color:#7a7f94;margin-top:8px;">${empName}</div>
-      </div>
-      <div id="spl-icon" style="width:48px;height:48px;border:3px solid #2a2f3d;border-top-color:#6c8fff;border-radius:50%;animation:splspin .8s linear infinite;margin-bottom:18px;"></div>
-      <div id="spl-msg" style="font-size:14px;color:#7a7f94;font-weight:500;">서버 연결 중...</div>
-      <div id="spl-sub" style="font-size:11px;color:#3a3f52;margin-top:6px;min-height:16px;"></div>
-      <button id="spl-btn" onclick="window._dismissSplash()"
-        style="display:none;margin-top:24px;padding:12px 32px;background:transparent;border:1.5px solid #3a3f52;border-radius:10px;color:#7a7f94;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
-        오프라인으로 시작
-      </button>
-      <style>@keyframes splspin{to{transform:rotate(360deg);}}@keyframes splcheck{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}</style>`;
-    document.body.appendChild(splash);
-  }
-
-  window._dismissSplash = function(){
-    const el = document.getElementById('app-splash');
-    if(!el) return;
-    el.style.opacity = '0';
-    setTimeout(()=>{ try{el.remove();}catch(e){} }, 400);
-  };
-
-  window._setSplash = function(status, msg, sub){
-    const icon  = document.getElementById('spl-icon');
-    const msgEl = document.getElementById('spl-msg');
-    const subEl = document.getElementById('spl-sub');
-    const btn   = document.getElementById('spl-btn');
-    if(msgEl) msgEl.textContent = msg || '';
-    if(subEl) subEl.textContent = sub || '';
-    if(status === 'success'){
-      if(icon){ icon.style.cssText='width:48px;height:48px;'; icon.innerHTML='<svg viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="24" r="21" fill="none" stroke="#3ddc84" stroke-width="3"/><path d="M14 24l7 7 13-13" fill="none" stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'; icon.style.animation='splcheck .35s ease'; }
-      if(msgEl){ msgEl.textContent='동기화 완료'; msgEl.style.color='#3ddc84'; }
-      if(btn) btn.style.display='none';
-      setTimeout(window._dismissSplash, 900);
-    } else if(status === 'offline' || status === 'error'){
-      if(icon){ icon.style.cssText='width:48px;height:48px;font-size:36px;text-align:center;line-height:48px;'; icon.textContent='📴'; }
-      if(msgEl){ msgEl.textContent= msg || '오프라인 모드'; msgEl.style.color='#ff9f43'; }
-      if(subEl) subEl.textContent = sub || '저장된 데이터로 시작합니다';
-      if(btn) btn.style.display='block';
-    }
-  };
-
-  // sync-status 요소 변화 감시 → init() 결과 감지
-  // son.html의 init()은 성공 시 sync-status를 '✅'로, 실패 시 '📴'로 변경
-  let _watched = false;
-  function watchSyncStatus(){
-    if(_watched) return;
-    const el = document.getElementById('sync-status');
-    if(!el){ setTimeout(watchSyncStatus, 100); return; }
-    _watched = true;
-
-    // 이미 완료됐으면 즉시 처리
-    if(el.textContent === '✅'){
-      window._setSplash('success', '동기화 완료');
-      return;
-    }
-    if(el.textContent === '📴'){
-      window._setSplash('offline', '오프라인 모드', '저장된 데이터로 시작합니다');
-      return;
-    }
-
-    // 아직 진행 중이면 MutationObserver로 감시
-    const observer = new MutationObserver(()=>{
-      const txt = el.textContent;
-      if(txt === '✅'){
-        window._setSplash('success', '동기화 완료');
-        observer.disconnect();
-      } else if(txt === '📴'){
-        window._setSplash('offline', '오프라인 모드', '저장된 데이터로 시작합니다');
-        observer.disconnect();
-      }
-    });
-    observer.observe(el, {childList:true, characterData:true, subtree:true});
-
-    // 12초 후에도 변화 없으면 오프라인 버튼 표시
-    setTimeout(()=>{
-      const btn = document.getElementById('spl-btn');
-      const sub = document.getElementById('spl-sub');
-      if(btn && btn.style.display === 'none'){
-        btn.style.display = 'block';
-        if(sub) sub.textContent = '연결이 오래 걸리고 있어요';
-      }
-    }, 12000);
-  }
-
-  // DOM 준비되면 감시 시작
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', watchSyncStatus);
-  } else {
-    watchSyncStatus();
-  }
-})();
 
 // patch.js v2 - son.html / bak.html 패치
 // son.html / bak.html 의 </body> 바로 앞에
@@ -175,48 +72,6 @@ function getLastVisit(storeName){
 
 // ══════════════ renderRoute 오버라이드 (프로그레스바 + 방문일) ══════════════
 
-function renderRoute(){
-  const list = getRouteList();
-  const el = document.getElementById('route-list');
-
-  if(!list.length){
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📍</div><div>루트 없음<br><span style="font-size:10px">출근탭에서 상차를 입력하거나<br>거래처 요일을 등록해주세요</span></div></div>';
-    renderRouteProgress(0, 0);
-    return;
-  }
-
-  updateDailyBar();
-  const savedCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
-  const doneCount = completedRoutes.filter(n => list.includes(n)).length;
-  renderRouteProgress(doneCount, list.length);
-
-  el.innerHTML = list.map((name, i) => {
-    const done = completedRoutes.includes(name);
-    const s = stores.find(x => x.이름 === name);
-    const cargo = savedCargos.find(c => c.거래처 === name);
-    const isMine = !s?.담당 || s?.담당 === EMP;
-    const meta = cargo ? `📦 ${cargo.유종} ${cargo.통수}통 상차` : (s?.유종 || '유종미등록');
-    const crossLabel = !isMine && s?.담당 ? `<span style="font-size:9px;color:var(--o);margin-left:4px">↔ ${s.담당}</span>` : '';
-    const visit = getLastVisit(name);
-    const visitBadge = visit ? `<span style="font-size:9px;font-weight:600;color:${visit.color};background:rgba(0,0,0,.25);padding:2px 6px;border-radius:10px;margin-left:5px">${visit.label}</span>` : '';
-
-    return `<div class="route-item ${done?'done':''}" id="ri-${i}" data-name="${name}">
-      <div class="route-order" style="background:${done?'var(--g)':'var(--p2)'};flex-shrink:0">${done?'✓':i+1}</div>
-      <div class="route-info" onclick="openDelivery('${name.replace(/'/g,"\'")}')" >
-        <div class="route-name">${name}${crossLabel}${visitBadge}</div>
-        <div class="route-meta" style="color:${cargo?'var(--o)':'var(--t2)'}">${meta}</div>
-      </div>
-      ${done
-        ?`<button onclick="deleteTxByStore('${name.replace(/'/g,"\'")}')"  style="padding:6px 10px;background:rgba(255,107,107,.12);border:none;border-radius:8px;color:var(--r);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">납품삭제</button>`
-        :`<button onclick="removeFromRoute('${name.replace(/'/g,"\'")}')"  style="padding:6px 10px;background:rgba(122,127,148,.12);border:none;border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">✕</button>`
-      }
-      <div class="drag-handle" draggable="true" ondragstart="dragStart(event,'${name}')" ondragover="dragOver(event)" ondrop="dragDrop(event,'${name}')" ondragend="dragEnd(event)">⠿</div>
-    </div>`;
-  }).join('');
-
-  if(typeof updateDailyBar==='function') updateDailyBar();
-}
-
 // ══════════════ saveDelivery 오버라이드 (완료 애니메이션 추가) ══════════════
 
 async function saveDelivery(){
@@ -224,7 +79,7 @@ async function saveDelivery(){
   if(items.length === 0 && !wasteOn){ showToast('품목 또는 폐유를 입력해주세요'); return; }
   if(!curPay){ showToast('수금방법을 선택해주세요'); return; }
 
-  const t = today();
+  const t = workDate();
   const storeName = curStore?.이름 || document.getElementById('chip-name').textContent || '임시거래처';
   const oilTotal = items.reduce((s,i) => isFeeItem(i.type,t)?s:s+i.qty*i.price, 0);
   const oilMargin = items.reduce((s,i) => {
@@ -318,46 +173,17 @@ function renderCarryOver(){
     </div>`).join('');
 }
 
-// ══════════════ updateDailyBar — 납품완료 거래처 수 ══════════════
 function updateDailyBar(){
-  const barEl = document.getElementById('daily-bar');
-  if(!barEl) return;
-
-  const savedCargos = JSON.parse(localStorage.getItem('cargo_today_' + (typeof EMP !== 'undefined' ? EMP : '')) || '[]');
-  const route = typeof getRouteList === 'function' ? getRouteList() : [];
-  const completed = typeof completedRoutes !== 'undefined' ? completedRoutes : [];
-
-  // 납품완료 거래처 수
-  const doneCount = completed.filter(n => route.includes(n)).length;
-  const totalCount = route.length;
-  const remainCount = totalCount - doneCount;
-
-  // 납품한 총 통수 (오늘 tx)
-  const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
-  const empName = typeof EMP !== 'undefined' ? EMP : '';
-  const todayTx = typeof txList !== 'undefined'
-    ? txList.filter(x => x.날짜 === t && x.직원 === empName)
-    : [];
-  const deliveredQty = todayTx.reduce((s, x) => s + (Math.abs(+x.통수) || 0), 0);
-  const remainQty = savedCargos.reduce((s, c) => {
-    if(!route.includes(c.거래처) || completed.includes(c.거래처)) return s;
-    return s + (c.통수 || 0);
-  }, 0);
-
-  // 폐유 수거 kg
-  const wasteKg = todayTx.reduce((s, x) => s + (+x.폐유kg || 0), 0);
-
-  const loadedEl = document.getElementById('bar-loaded');
-  const doneRemEl = document.getElementById('bar-done-remain');
-  const wasteEl = document.getElementById('bar-waste-kg');
-
-  if(loadedEl) loadedEl.textContent = doneCount;
-  if(doneRemEl){
-    doneRemEl.innerHTML = `<span style="color:var(--g)">${deliveredQty}</span> / <span style="color:var(--t2)">${remainQty}</span>`;
-  }
-  if(wasteEl) wasteEl.textContent = wasteKg > 0 ? wasteKg.toFixed(1) : '-';
-
-  barEl.style.display = totalCount > 0 ? 'block' : 'none';
+  const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]'),t=today();
+  const loaded=savedCargos.reduce((s,c)=>s+(c.통수||0),0);
+  const doneTx=txList.filter(x=>x.날짜===t&&x.직원===EMP);
+  const doneQty=doneTx.reduce((s,x)=>s+Math.max(0,x.통수||0),0);
+  const remainQty=Math.max(0,loaded-doneQty);
+  const wasteKg=doneTx.reduce((s,x)=>s+(x.폐유kg||0),0);
+  const loadedEl=document.getElementById('bar-loaded'),doneRemEl=document.getElementById('bar-done-remain'),wasteEl=document.getElementById('bar-waste-kg');
+  if(loadedEl) loadedEl.textContent=loaded||'-';
+  if(doneRemEl) doneRemEl.innerHTML=`<span style="color:var(--g)">${doneQty}</span> / <span style="color:var(--t2)">${remainQty}</span>`;
+  if(wasteEl) wasteEl.textContent=wasteKg>0?wasteKg.toFixed(1):'-';
 }
 
 async function loadStoreInfo(storeName){
@@ -401,14 +227,6 @@ async function saveNewStore(){
   try{const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'store_add',store})});const d=await res.json();if(d.ok===false){showToast('⚠️ '+d.error);return;}}catch(e){showToast('⚠️ 서버 저장 실패 - 로컬에만 추가');}
   stores.push(store);localStorage.setItem('stores_v3',JSON.stringify(stores));
   showToast(`✅ "${이름}" 추가됐어요!`);closeModal('new-store-modal');selectStore(이름);
-  // 루트 즉시 반영
-  if(typeof renderRoute==='function') renderRoute();
-  // boss 연동 — 신규배정 상태로 업데이트
-  try{
-    const t2 = typeof today==='function' ? today() : new Date().toISOString().slice(0,10);
-    await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
-      body:JSON.stringify({type:'store_update',store:{이름,배정상태:'신규배정',배정직원:EMP,배정날짜:t2}})});
-  }catch(e2){}
 }
 
 function renderPriceTab(){
@@ -477,7 +295,7 @@ async function batchCopyReceipts(){
 // ══════════════ 차량재고 서버 동기화 ══════════════
 
 async function syncCargoToServer(){
-  const t = today();
+  const t = workDate();
   const cargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
   try{
     await fetch(API, {
@@ -489,7 +307,7 @@ async function syncCargoToServer(){
 }
 
 async function loadCargoFromServer(){
-  const t = today();
+  const t = workDate();
   try{
     const res = await fetch(`${API}?type=cargo_today&emp=${encodeURIComponent(EMP)}&date=${t}`);
     const d = await res.json();
@@ -516,7 +334,7 @@ async function saveCheckin(){
   const wcp = getWastePriceAt(today());
   const totalReal = validPallets.reduce((s,p)=>s+p.실중량,0);
   const income = Math.round(totalReal*wcp);
-  const t = today();
+  const t = workDate();
 
   try{
     // 폐유납품 저장 (수거처목록 포함)
@@ -664,130 +482,56 @@ async function init(){
 
 
 // ── renderRoute 오버라이드 (프로그레스바 + 방문일) ──
-function getLastVisit(storeName){
-  const list = (typeof txList !== 'undefined' ? txList : [])
-    .filter(x => x.거래처 === storeName && x.날짜)
-    .sort((a, b) => b.날짜.localeCompare(a.날짜));
-  if(!list.length) return null;
-  const diff = Math.floor((new Date(today()) - new Date(list[0].날짜)) / 86400000);
-  if(diff === 0) return {label:'오늘', color:'var(--g)'};
-  if(diff === 1) return {label:'어제', color:'var(--p)'};
-  if(diff <= 7)  return {label:`${diff}일 전`, color:'var(--t2)'};
-  if(diff <= 30) return {label:`${diff}일 전`, color:'var(--y)'};
-  return {label:`${diff}일 전`, color:'var(--r)'};
-}
 
-function renderRouteProgress(done, total){
+const _origRenderRoute = typeof renderRoute === 'function' ? renderRoute : null;
+
+function renderRoute(){
+  const list = getRouteList();
+  const el = document.getElementById('route-list');
   const prog = document.getElementById('route-progress');
-  if(!prog) return;
-  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-  const allDone = done === total && total > 0;
-  prog.innerHTML = `
-    <div style="display:flex;align-items:center;gap:8px">
-      <div style="font-size:12px;font-weight:700;color:${allDone?'var(--g)':'var(--t2)'};white-space:nowrap">
-        ${allDone ? '✅ 완료' : `${done}/${total}`}
+  if(!list.length){
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📍</div><div>루트 없음<br><span style="font-size:10px">출근탭에서 상차를 입력하거나<br>거래처 요일을 등록해주세요</span></div></div>';
+    if(prog) prog.innerHTML = '';
+    return;
+  }
+  updateDailyBar();
+  const savedCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
+  const doneCount = completedRoutes.filter(n => list.includes(n)).length;
+  renderRouteProgress(doneCount, list.length);
+  el.innerHTML = list.map((name, i) => {
+    const done = completedRoutes.includes(name);
+    const s = stores.find(x => x.이름 === name);
+    const cargo = savedCargos.find(c => c.거래처 === name);
+    const isMine = !s?.담당 || s?.담당 === EMP;
+    const meta = cargo ? `📦 ${cargo.유종} ${cargo.통수}통 상차` : (s?.유종 || '유종미등록');
+    const crossLabel = !isMine && s?.담당 ? `<span style="font-size:9px;color:var(--o);margin-left:4px">↔ ${s.담당}</span>` : '';
+    const visit = getLastVisit(name);
+    const visitBadge = visit
+      ? `<span style="font-size:9px;font-weight:600;color:${visit.color};background:rgba(0,0,0,.2);padding:2px 6px;border-radius:10px;margin-left:4px">${visit.label}</span>`
+      : '';
+    return `<div class="route-item ${done ? 'done' : ''}" id="ri-${i}" data-name="${name}">
+      <div class="route-order" style="background:${done ? 'var(--g)' : 'var(--p2)'};flex-shrink:0">${done ? '✓' : i+1}</div>
+      <div class="route-info" onclick="openDelivery('${name}')">
+        <div class="route-name">${name}${crossLabel}${visitBadge}</div>
+        <div class="route-meta" style="color:${cargo ? 'var(--o)' : 'var(--t2)'}">${meta}</div>
       </div>
-      <div style="width:72px;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${pct}%;background:${allDone?'var(--g)':'var(--p)'};border-radius:3px;transition:width .4s ease"></div>
-      </div>
-      <div style="font-size:10px;color:var(--t3)">${pct}%</div>
+      ${done
+        ? `<button onclick="deleteTxByStore('${name}')" style="padding:6px 10px;background:rgba(255,107,107,.12);border:none;border-radius:8px;color:var(--r);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">납품삭제</button>`
+        : `<button onclick="removeFromRoute('${name}')" style="padding:6px 10px;background:rgba(122,127,148,.12);border:none;border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">✕</button>`
+      }
+      <div class="drag-handle" draggable="true"
+        ondragstart="dragStart(event,'${name}')"
+        ondragover="dragOver(event)"
+        ondrop="dragDrop(event,'${name}')"
+        ondragend="dragEnd(event)">⠿</div>
     </div>`;
+  }).join('');
 }
-
 
 // ── saveDelivery 오버라이드 (완료 애니메이션) ──
 const _origSaveDelivery = typeof saveDelivery === 'function' ? saveDelivery : null;
 
-async function saveDelivery(){
-  if(!curStore && !document.getElementById('chip-name').textContent){ showToast('거래처를 선택해주세요'); return; }
-  if(items.length === 0 && !wasteOn){ showToast('품목 또는 폐유를 입력해주세요'); return; }
-  if(!curPay){ showToast('수금방법을 선택해주세요'); return; }
-
-  const t = today();
-  const storeName = curStore?.이름 || document.getElementById('chip-name').textContent || '임시거래처';
-  const oilTotal = items.reduce((s, i) => isFeeItem(i.type, t) ? s : s + i.qty * i.price, 0);
-  const oilMargin = items.reduce((s, i) => {
-    if(isFeeItem(i.type, t)) return s + i.qty * (getPriceAt(i.type, t) || 0);
-    return s + i.qty * (i.price - (getPriceAt(i.type, t) || 0));
-  }, 0);
-
-  let wasteKg = 0, wastePriceVal = 0, wastePay = 0, wasteRev = 0;
-  if(wasteOn){
-    if(wasteModeCalc){
-      wasteKg = parseFloat(document.getElementById('w-kg')?.value) || 0;
-      wastePriceVal = parseFloat(document.getElementById('w-price')?.value) || 0;
-      wastePay = Math.round(wasteKg * wastePriceVal);
-    } else {
-      wastePay = parseFloat(document.getElementById('w-direct')?.value) || 0;
-    }
-    const wcp2 = getWastePriceAt(t);
-    wasteRev = wasteModeCalc ? Math.round(wasteKg * (wcp2 - wastePriceVal)) : 0;
-  }
-
-  const charge = oilTotal - wastePay;
-  const payAmt = parseFloat(document.getElementById('pay-amount')?.value) || 0;
-
-  const tx = {
-    id: `${t}_${EMP}_${storeName}_${Date.now()}`,
-    날짜: t,
-    시간: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}),
-    직원: EMP, 거래처: storeName,
-    유종: items.map(i => i.type).filter(Boolean).join('/'),
-    품목상세: JSON.stringify(items.map(i => ({type:i.type, qty:i.qty, price:i.price}))),
-    통수: items.reduce((s, i) => s + i.qty, 0),
-    판매단가: items.length === 1 ? items[0].price : 0,
-    출고가: items.length === 1 ? (getPriceAt(items[0].type, t) || 0) : 0,
-    폐유kg: wasteKg, 폐유매입단가: wastePriceVal,
-    식유금액: oilTotal, 폐유매입금: wastePay, 차감청구: charge,
-    식유마진: oilMargin, 폐유수익: wasteRev, 총수익: oilMargin + wasteRev,
-    수금방법: curPay, 수금액: payAmt,
-    미수: curPay === '미수' || curPay === '반품',
-    비고: document.getElementById('d-note')?.value || ''
-  };
-
-  // 로컬 먼저 저장
-  txList.unshift(tx);
-  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7);
-  localStorage.setItem(`tx_${EMP}_v3`, JSON.stringify(txList.filter(x => x.날짜 >= cutoff.toISOString().slice(0,10)).slice(0, 500)));
-
-  // 반품 시 차량재고 복귀
-  const returnItems = items.filter(i => i.qty < 0);
-  if(returnItems.length > 0){
-    const todayCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
-    returnItems.forEach(ri => {
-      const ex = todayCargos.find(c => c.유종 === ri.type && c.거래처 === storeName);
-      if(ex) ex.통수 = Math.max(0, ex.통수 + Math.abs(ri.qty));
-      else todayCargos.push({거래처:'', 유종:ri.type, 통수:Math.abs(ri.qty), 반품이월:true});
-    });
-    localStorage.setItem(`cargo_today_${EMP}`, JSON.stringify(todayCargos));
-  }
-
-  if(!completedRoutes.includes(storeName)) completedRoutes.push(storeName);
-  localStorage.setItem(`done_${EMP}_${t}`, JSON.stringify(completedRoutes));
-
-  // 현금/폐유 자동 입금 기록
-  if(curPay === '현금지급' || curPay === '이체지급' || curPay === '미수차감폐유'){
-    const payAmt2 = wastePay || Math.abs(charge);
-    if(payAmt2 > 0){
-      await savePayment({거래처:storeName, 금액:-payAmt2, 날짜:t, 입금자명:'폐유대금', 방법:curPay==='이체지급'?'계좌이체':'현금지급', 비고:'폐유수거 대금 지급'});
-    }
-  }
-  if(curPay === '현금' && payAmt > 0){
-    await savePayment({거래처:storeName, 금액:payAmt, 날짜:t, 입금자명:curStore?.입금자||storeName, 방법:'현금', 비고:'현장 현금수령'});
-  }
-
-  // 서버 전송
-  await safeFetch({type:'tx', tx}, () => {
-    const isReturn = returnItems.length > 0;
-    if(!isReturn) showDeliverySuccess(storeName);
-    else showToast('↩️ 반품 저장 (차량재고 복구)');
-    hideDeliveryForm();
-    renderRoute();
-    renderHistory();
-    updateDailyBar();
-    showReceiptButton(tx);
-  });
-}
+async 
 
 // ══════════════ DOM 보완 - son/bak.html HTML에 없는 엘리먼트 동적 생성 ══════════════
 (function fixEmpDOMIssues(){
@@ -833,7 +577,7 @@ function addItem(typeVal, qtyVal, priceVal){
 }
 
 function applyItemSecurity(){
-  const t = today();
+  const t = workDate();
   document.querySelectorAll('.item-card').forEach(card => {
     const typeInput = card.querySelector('[id^="item-type-"], [id^="it-type-"], .type-search-input');
     const priceInput = card.querySelector('[id^="item-price-"], [id^="it-price-"]');
@@ -921,7 +665,7 @@ function openDelivery(name){
   const s = stores.find(x => x.이름 === name);
   const savedCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
   const cargo = savedCargos.find(c => c.거래처 === name);
-  const t = today();
+  const t = workDate();
   const wcp = getWastePriceAt(t);
 
   // 미수 로컬 계산
@@ -954,6 +698,7 @@ function openDelivery(name){
     </div>
 
     <!-- 미수 표시 -->
+    ${_overLimit ? `<div style="background:rgba(255,107,107,.1);border:1px solid var(--r);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:11px;color:var(--r);font-weight:700;">⚠️ 미수한도 초과! ${misuAmt.toLocaleString()}원 / 한도 ${_misuLimit.toLocaleString()}원</div>` : ''}
     ${misuAmt > 0 ? `
     <div style="background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
       <span style="font-size:12px;color:var(--t2);">현재 미수잔액</span>
@@ -1085,7 +830,7 @@ function openDelivery(name){
 
 // ── 수금 버튼 활성/비활성 로직 ──
 function updateInlinePayBtns(idx){
-  const t = today();
+  const t = workDate();
   const items = getInlineItems(idx);
   const wasteOn = inlineWasteOn[idx] || false;
   const wasteMode = inlineWasteMode[idx] || 'calc';
@@ -1166,34 +911,8 @@ function onInlineTypeSearch(itemIdx, formIdx){
   const q = (document.getElementById(`itype-${itemIdx}-${formIdx}`)?.value||'').trim().toLowerCase();
   const dd = document.getElementById(`itdd-${itemIdx}-${formIdx}`);
   if(!dd) return;
-  const t = today();
-  const allOpts = getTypeOptions();
-  // 거래처 추천 유종 우선
-  const storeName = (typeof curStore !== 'undefined' && curStore?.이름) || '';
-  const rec = new Set();
-  if(storeName){
-    const s = (typeof stores !== 'undefined' ? stores : []).find(x=>x.이름===storeName);
-    if(s?.유종) s.유종.split('/').filter(Boolean).forEach(v=>rec.add(v.trim()));
-  }
-  const opts = q ? allOpts.filter(o=>o.toLowerCase().includes(q)) : allOpts.slice(0,15);
-  dd.innerHTML = opts.map(o=>{
-    const cost = getPriceAt(o, t) || 0;
-    const isFee = isFeeItem(o, t);
-    const isNeg = cost < 0;
-    const isRec = rec.has(o);
-    const tag = isFee
-      ? `<span style="font-size:9px;color:var(--o);background:rgba(255,159,67,.1);border-radius:4px;padding:1px 5px;margin-left:4px;">수수료</span>`
-      : isNeg
-        ? `<span style="font-size:9px;color:var(--g);background:rgba(61,220,132,.1);border-radius:4px;padding:1px 5px;margin-left:4px;">수입</span>`
-        : '';
-    const priceTag = !isFee && !isNeg && cost > 0
-      ? `<span style="font-size:10px;color:var(--t3);margin-left:auto;font-family:'JetBrains Mono',monospace;">${cost.toLocaleString()}</span>`
-      : '';
-    const recDot = isRec ? `<span style="color:var(--g);font-size:9px;margin-left:3px;">★</span>` : '';
-    return `<div class="type-opt" style="display:flex;align-items:center;gap:2px;" onmousedown="selectInlineType(${itemIdx},${formIdx},'${o}')">
-      <span>${o}</span>${recDot}${tag}${priceTag}
-    </div>`;
-  }).join('') || `<div class="type-opt" style="color:var(--t3)">결과 없음</div>`;
+  const opts = q ? getTypeOptions().filter(t=>t.toLowerCase().includes(q)) : getTypeOptions().slice(0,12);
+  dd.innerHTML = opts.map(t=>`<div class="type-opt" onmousedown="selectInlineType(${itemIdx},${formIdx},'${t}')">${t}</div>`).join('');
   dd.classList.add('show');
 }
 
@@ -1204,16 +923,8 @@ function hideInlineDd(itemIdx, formIdx){
 function selectInlineType(itemIdx, formIdx, type){
   const el = document.getElementById(`itype-${itemIdx}-${formIdx}`);
   if(el) el.value = type;
-  // 중복 유종 경고
-  const existing = getInlineItems(formIdx).filter((item, i) => {
-    const otherEl = document.getElementById(`itype-${i === 0 ? 0 : i}-${formIdx}`);
-    return otherEl && otherEl.value === type && i !== itemIdx;
-  });
-  if(existing.length > 0) {
-    if(typeof showToast === 'function') showToast(`⚠️ ${type} 이미 입력됨 — 통수 합산 권장`);
-  }
   hideInlineDd(itemIdx, formIdx);
-  const t = today();
+  const t = workDate();
   const costPrice = getPriceAt(type, t) || 0;
   const isFee = isFeeItem(type, t);
   const isNeg = costPrice < 0;
@@ -1325,7 +1036,7 @@ function setInlinePay(idx, type){
 
 function getInlineItems(idx){
   const items = [];
-  const t = today();
+  const t = workDate();
   const process = (itemIdx) => {
     const type  = document.getElementById(`itype-${itemIdx}-${idx}`)?.value||'';
     const qty   = parseFloat(document.getElementById(`iqty-${itemIdx}-${idx}`)?.value)||0;
@@ -1344,7 +1055,7 @@ function getInlineItems(idx){
 }
 
 function calcInline(idx){
-  const t = today();
+  const t = workDate();
   const items = getInlineItems(idx);
   const wasteOn   = inlineWasteOn[idx] || false;
   const wasteMode = inlineWasteMode[idx] || 'calc';
@@ -1416,7 +1127,12 @@ function calcInline(idx){
 }
 
 async function saveInlineDelivery(name, idx){
-  const t = today();
+  const t = workDate();
+  // 마감 월 체크
+  if(typeof isMonthClosed === 'function'){
+    const closed = await isMonthClosed(t);
+    if(closed){ showToast(`⛔ ${t.slice(0,7)} 은 마감된 월이에요`); return; }
+  }
   const items = getInlineItems(idx);
   const wasteOn   = inlineWasteOn[idx] || false;
   const wasteMode = inlineWasteMode[idx] || 'calc';
@@ -1490,9 +1206,18 @@ async function saveInlineDelivery(name, idx){
   if(!completedRoutes.includes(name)) completedRoutes.push(name);
   localStorage.setItem(`done_${EMP}_${t}`, JSON.stringify(completedRoutes));
 
-  // 현금/폐유 자동 입금
-  const _aidx = (typeof getRouteList==='function') ? getRouteList().indexOf(name) : -1;
-  if(_aidx >= 0) setTimeout(()=>{ if(typeof playDoneAnimation==='function') playDoneAnimation(_aidx); }, 80);
+  // 신규등록 배차 완료 시 → 정식 거래처로 업데이트
+  const _dispStore = (typeof stores !== 'undefined') ? stores.find(s=>s.이름===name) : null;
+  if(_dispStore && _dispStore.배정타입 === '신규등록'){
+    _dispStore.배정타입 = '정식등록완료';
+    try{
+      await fetch(typeof API !== 'undefined' ? API : '', {
+        method:'POST', headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({type:'store_update', store:{이름:name, 배정타입:'정식등록완료', 배정상태:''}})
+      });
+      if(typeof showToast==='function') showToast(`🎉 ${name} 정식 거래처 등록 완료!`);
+    }catch(e){}
+  }
 
   // 현금/폐유 자동 입금
   const s = stores.find(x=>x.이름===name);
@@ -1511,42 +1236,11 @@ async function saveInlineDelivery(name, idx){
 }
 
 // ══════════════ DOM 보완 - son/bak.html HTML에 없는 엘리먼트 동적 생성 ══════════════
-(function fixEmpDOMIssues(){
-  const fix = () => {
-    // hist-month-label이 없으면 내역탭 헤더에 동적 추가
-    if(!document.getElementById('hist-month-label')){
-      const hdr = document.querySelector('#page-history .page-hdr > div');
-      if(hdr){
-        const lbl = document.createElement('div');
-        lbl.id = 'hist-month-label';
-        lbl.style.cssText = 'font-size:11px;color:var(--t3)';
-        hdr.appendChild(lbl);
-        // 값 채우기
-        const now = new Date();
-        lbl.textContent = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-      }
-    }
-    // price-search input 숨기기
-    const priceSearch = document.getElementById('price-search');
-    if(priceSearch){
-      const wrap = priceSearch.closest('.inp-wrap');
-      if(wrap) wrap.style.display = 'none';
-    }
-  };
-  if(document.readyState === 'complete' || document.readyState === 'interactive'){
-    setTimeout(fix, 50);
-  } else {
-    document.addEventListener('DOMContentLoaded', () => setTimeout(fix, 50));
-  }
-})();
 
 // ══════════════ 3단계: 계근/상차 여러 번 가능 ══════════════
 const _origSaveCheckin2 = typeof saveCheckin === 'function' ? saveCheckin : null;
 
-async function saveCheckin(){
-  if(_origSaveCheckin2) await _origSaveCheckin2();
-  setTimeout(() => renderCheckinAddBtn(), 200);
-}
+async 
 
 function renderCheckinAddBtn(){
   if(document.getElementById('checkin-add-btn')) return;
@@ -1579,27 +1273,16 @@ function renderCheckinAddBtn(){
   history.insertAdjacentElement('afterend', btn);
 }
 
-// ── renderCheckinHistory 추가 기능 (무한루프 없이) ──
-(function safeRCHPatch(){
-  let _done = false;
-  function _patch(){
-    if(_done || typeof renderCheckinHistory !== 'function') return;
-    _done = true;
-    const _orig = renderCheckinHistory;
-    window.renderCheckinHistory = function(){
-      _orig.call(this);
-      try{
-        const _t = typeof today==='function' ? today() : new Date().toISOString().slice(0,10);
-        const _emp = typeof EMP!=='undefined' ? EMP : '';
-        const _logs = JSON.parse(localStorage.getItem('checkin_log_'+_emp+'_'+_t)||'[]');
-        if(_logs.length>0) setTimeout(renderCheckinAddBtn, 100);
-        if(typeof renderCheckinDaySummary==='function') renderCheckinDaySummary(_logs);
-      }catch(e){}
-    };
-  }
-  setTimeout(_patch, 300);
-  document.addEventListener('DOMContentLoaded', ()=>setTimeout(_patch,100));
-})();
+const _origRenderCheckinHistory2 = typeof renderCheckinHistory === 'function' ? renderCheckinHistory : null;
+
+function renderCheckinHistory(){
+  if(_origRenderCheckinHistory2) _origRenderCheckinHistory2();
+  const t = typeof workDate === 'function' ? workDate() : (typeof today === 'function' ? today() : new Date().toISOString().slice(0,10));
+  const empName = typeof EMP !== 'undefined' ? EMP : '';
+  const logs = JSON.parse(localStorage.getItem(`checkin_log_${empName}_${t}`) || '[]');
+  if(logs.length > 0) setTimeout(renderCheckinAddBtn, 100);
+  renderCheckinDaySummary(logs);
+}
 
 function renderCheckinDaySummary(logs){
   if(!logs || !logs.length) return;
@@ -1652,55 +1335,22 @@ function renderCheckinDaySummary(logs){
 let _lastUrgentCheck = '';
 
 function checkUrgentAssignments(){
-  // 30초마다 GAS에서 stores 재조회해서 긴급배정 감지
-  fetch(typeof API !== 'undefined' ? API + '?type=stores' : '')
-    .then(r => r.json())
-    .then(d => {
-      if(!d.stores || !d.stores.length) return;
-      // 로컬 stores 업데이트
-      if(typeof stores !== 'undefined') {
-        stores = d.stores.map(s=>({
-          코드:s.코드||'',이름:s.이름||'',담당:s.담당||'',요일:s.요일||'',
-          유종:s.유종||'',연락처:s.연락처||'',입금자:s.입금자||'',
-          배정상태:s.배정상태||'',배정직원:s.배정직원||'',배정날짜:s.배정날짜||'',
-          상태:s.상태||'활성'
-        }));
-        localStorage.setItem('stores_v3', JSON.stringify(stores));
-      }
-      // 긴급배정 확인
-      const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
-      const empName = typeof EMP !== 'undefined' ? EMP : '';
-      const urgent = (typeof stores !== 'undefined' ? stores : []).filter(s =>
-        s.배정상태 === '긴급배정' &&
-        s.배정날짜 === t &&
-        (s.배정직원 === empName || s.담당 === empName) &&
-        s.상태 !== '비활성' &&
-        (typeof completedRoutes === 'undefined' || !completedRoutes.includes(s.이름))
-      );
-      if(!urgent.length) return;
-      const urgentKey = urgent.map(s=>s.이름).sort().join(',');
-      if(urgentKey === _lastUrgentCheck) return;
-      _lastUrgentCheck = urgentKey;
-      if(typeof renderRoute === 'function') renderRoute();
-      if(typeof showToast === 'function') showToast(`🚗 긴급배정: ${urgent.map(s=>s.이름).join(', ')}`);
-    })
-    .catch(() => {
-      // 네트워크 실패 시 로컬 캐시로 처리
-      if(typeof stores === 'undefined') return;
-      const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
-      const empName = typeof EMP !== 'undefined' ? EMP : '';
-      const urgent = stores.filter(s =>
-        s.배정상태 === '긴급배정' &&
-        s.배정날짜 === t &&
-        (s.배정직원 === empName || s.담당 === empName) &&
-        s.상태 !== '비활성'
-      );
-      if(!urgent.length) return;
-      const urgentKey = urgent.map(s=>s.이름).sort().join(',');
-      if(urgentKey === _lastUrgentCheck) return;
-      _lastUrgentCheck = urgentKey;
-      if(typeof renderRoute === 'function') renderRoute();
-    });
+  if(typeof stores === 'undefined') return;
+  const t = typeof workDate === 'function' ? workDate() : (typeof today === 'function' ? today() : new Date().toISOString().slice(0,10));
+  const empName = typeof EMP !== 'undefined' ? EMP : '';
+  const urgent = stores.filter(s =>
+    s.배정상태 === '긴급배정' &&
+    s.배정날짜 === t &&
+    (s.배정직원 === empName || s.담당 === empName) &&
+    s.상태 !== '비활성' &&
+    (typeof completedRoutes === 'undefined' || !completedRoutes.includes(s.이름))
+  );
+  if(!urgent.length) return;
+  const urgentKey = urgent.map(s=>s.이름).sort().join(',');
+  if(urgentKey === _lastUrgentCheck) return;
+  _lastUrgentCheck = urgentKey;
+  if(typeof renderRoute === 'function') renderRoute();
+  if(typeof showToast === 'function') showToast(`🚨 긴급 배정 ${urgent.length}건 — ${urgent.map(s=>s.이름).join(', ')}`);
 }
 
 (function startUrgentCheck2(){
@@ -1708,93 +1358,146 @@ function checkUrgentAssignments(){
   setInterval(checkUrgentAssignments, 30000);
 })();
 
-// ══════════════ getRouteList 오버라이드 — 미배정=공유, 대리납품 ══════════════
-(function patchGetRouteList(){
-  function _patch(){
-    if(typeof getRouteList !== 'function') return;
-    const _orig = getRouteList;
-    window.getRouteList = function(){
-      try{
-        const _cargos = JSON.parse(localStorage.getItem('cargo_today_'+EMP)||'[]');
-        const _t = typeof today==='function' ? today() : new Date().toISOString().slice(0,10);
-        const _day = ['일','월','화','수','목','금','토'][new Date().getDay()];
-        const _skip = JSON.parse(localStorage.getItem('skip_'+EMP+'_'+_t)||'[]');
-        const _st = typeof stores!=='undefined' ? stores : [];
+// ══════════════ workDate 앱시작 체크 ══════════════
+(function checkWorkDateOnLoad(){
+  function _check(){
+    const empName = typeof EMP !== 'undefined' ? EMP : '';
+    if(!empName) return;
+    const wd = localStorage.getItem(`workDate_${empName}`);
+    if(!wd) return;
+    const todayStr = new Date().toISOString().slice(0,10);
+    if(wd === todayStr) return;
+    const dayDiff = Math.floor((new Date(todayStr) - new Date(wd)) / 86400000);
+    if(dayDiff <= 0) return;
 
-        // 오늘 배차된 거래처 (긴급배정)
-        const dispatched = _st.filter(s=>
-          s.배정상태==='긴급배정' && s.배정날짜===_t &&
-          (s.배정직원===EMP||s.담당===EMP) && s.상태!=='비활성'
-        ).map(s=>s.이름);
+    // 미완료 계산
+    const cargos = JSON.parse(localStorage.getItem(`cargo_today_${empName}`) || '[]');
+    const completed = JSON.parse(localStorage.getItem(`done_${empName}_${wd}`) || '[]');
+    const cargoStores = [...new Set(cargos.filter(c=>c.거래처).map(c=>c.거래처))];
+    const incomplete = cargoStores.filter(n => !completed.includes(n));
+    if(incomplete.length > 0){
+      localStorage.setItem(`incomplete_${empName}_${wd}`, JSON.stringify(incomplete));
+    }
 
-        // 상차한 거래처 (항상 포함)
-        const cargoNames = _cargos.filter(c=>c.거래처).map(c=>c.거래처);
-
-        // 내 담당 + 요일 있는 거래처 (오늘 요일만)
-        const mine = _st.filter(s=>
-          s.상태!=='비활성' && s.담당===EMP && s.요일 && s.요일===_day
-        ).map(s=>s.이름);
-
-        // 미배정(공유) + 요일 있는 거래처
-        const shared = _st.filter(s=>
-          s.상태!=='비활성' &&
-          (!s.담당||s.담당===''||s.담당==='공유') &&
-          s.요일 && s.요일===_day
-        ).map(s=>s.이름);
-
-        // 타담당 + 요일 있는 거래처 (대리납품)
-        const others = _st.filter(s=>
-          s.상태!=='비활성' && s.담당 &&
-          s.담당!==EMP && s.담당!=='공유' && s.요일===_day
-        ).map(s=>s.이름);
-
-        // 합치기: 배차 > 상차 > 요일담당 > 공유 > 타담당
-        // 요일 없는 거래처는 상차한 것만 (교촌 등 프랜차이즈)
-        const all = [...new Set([
-          ...dispatched,
-          ...cargoNames,
-          ...mine,
-          ...shared,
-          ...others,
-        ])].filter(n=>!_skip.includes(n));
-
-        const ordered = [];
-        if(typeof routeOrder!=='undefined'){
-          routeOrder.forEach(n=>{ if(all.includes(n)) ordered.push(n); });
-        }
-        all.forEach(n=>{ if(!ordered.includes(n)) ordered.push(n); });
-        return ordered;
-      }catch(e){
-        return typeof _orig==='function' ? _orig() : [];
+    setTimeout(() => {
+      const msg = incomplete.length > 0
+        ? `${wd} 업무가 마감되지 않았어요.
+미완료 거래처 ${incomplete.length}곳 있음.
+자동 마감 처리할게요.`
+        : `${wd} 업무 자동 마감 처리할게요.`;
+      if(confirm(msg)){
+        localStorage.removeItem(`workDate_${empName}`);
+        if(typeof showToast === 'function') showToast('이전 업무 자동 마감됐어요');
+        if(typeof renderIncomplete === 'function') renderIncomplete();
+        // workdate 뱃지 숨기기
+        const wb = document.getElementById('workdate-badge');
+        const cb = document.getElementById('clockout-btn');
+        if(wb) wb.style.display = 'none';
+        if(cb) cb.style.display = 'none';
       }
-    };
+    }, 2000);
   }
-  setTimeout(_patch, 400);
-  document.addEventListener('DOMContentLoaded', ()=>setTimeout(_patch, 200));
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', () => setTimeout(_check, 2500));
+  } else {
+    setTimeout(_check, 2500);
+  }
 })();
 
+// ══════════════ 퇴근 처리 ══════════════
+function clockOut(){
+  const empName = typeof EMP !== 'undefined' ? EMP : '';
+  const wd = typeof workDate === 'function' ? workDate() : new Date().toISOString().slice(0,10);
+  const cargos = JSON.parse(localStorage.getItem(`cargo_today_${empName}`) || '[]');
+  const completed = JSON.parse(localStorage.getItem(`done_${empName}_${wd}`) || '[]');
+  const cargoStores = [...new Set(cargos.filter(c=>c.거래처).map(c=>c.거래처))];
+  const incomplete = cargoStores.filter(n => !completed.includes(n));
 
+  const msg = incomplete.length > 0
+    ? `미완료 거래처 ${incomplete.length}곳:\n${incomplete.slice(0,3).join(', ')}${incomplete.length>3?` 외 ${incomplete.length-3}곳`:''}\n\n퇴근할까요?`
+    : '퇴근할까요?';
+  if(!confirm(msg)) return;
 
-// ══════════════ 납품 완료 애니메이션 ══════════════
-function playDoneAnimation(idx){
-  const card = document.getElementById('ri-' + idx);
-  if(!card) return;
-
-  // 완료 오버레이
-  const overlay = document.createElement('div');
-  overlay.style.cssText = 'position:absolute;inset:0;border-radius:12px;background:rgba(61,220,132,.15);display:flex;align-items:center;justify-content:center;z-index:10;pointer-events:none;animation:doneFlash .6s ease forwards;';
-  overlay.innerHTML = '<div style="font-size:32px;animation:donePop .4s ease;">✅</div>';
-  card.style.position = 'relative';
-  card.appendChild(overlay);
-
-  setTimeout(()=>{ overlay.remove(); }, 700);
+  if(incomplete.length > 0){
+    localStorage.setItem(`incomplete_${empName}_${wd}`, JSON.stringify(incomplete));
+  }
+  localStorage.removeItem(`workDate_${empName}`);
+  const wb = document.getElementById('workdate-badge');
+  const cb = document.getElementById('clockout-btn');
+  if(wb) wb.style.display = 'none';
+  if(cb) cb.style.display = 'none';
+  if(typeof showToast === 'function') showToast('퇴근 처리됐어요 ✅');
+  if(typeof renderIncomplete === 'function') renderIncomplete();
+  if(typeof goTab === 'function') goTab('checkin');
 }
 
-// CSS 애니메이션 한번만 추가
-(function addDoneCSS(){
-  if(document.getElementById('done-anim-css')) return;
-  const style = document.createElement('style');
-  style.id = 'done-anim-css';
-  style.textContent = '@keyframes doneFlash{0%{opacity:0}30%{opacity:1}70%{opacity:1}100%{opacity:0}}@keyframes donePop{0%{transform:scale(.3)}60%{transform:scale(1.3)}100%{transform:scale(1)}}';
-  document.head.appendChild(style);
-})();
+// ══════════════ 미완료 거래처 표시 ══════════════
+function renderIncomplete(){
+  const empName = typeof EMP !== 'undefined' ? EMP : '';
+  const sec = document.getElementById('incomplete-section');
+  const listEl = document.getElementById('incomplete-list');
+  const dateEl = document.getElementById('incomplete-date');
+  if(!sec || !listEl) return;
+
+  let found = null, foundDate = null;
+  Object.keys(localStorage).forEach(k => {
+    if(k.startsWith(`incomplete_${empName}_`)){
+      const date = k.replace(`incomplete_${empName}_`, '');
+      if(!foundDate || date > foundDate){ foundDate = date; found = k; }
+    }
+  });
+
+  if(!found){ sec.style.display='none'; return; }
+  const incomplete = JSON.parse(localStorage.getItem(found) || '[]');
+  if(!incomplete.length){ sec.style.display='none'; return; }
+
+  sec.style.display = 'block';
+  if(dateEl) dateEl.textContent = foundDate + ' 미완료';
+  listEl.innerHTML = incomplete.map(name =>
+    `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,107,107,.1);">
+      <span style="font-size:12px;">${name}</span>
+      <button onclick="dismissIncomplete('${name.replace(/'/g,"\'")}','${found}')"
+        style="font-size:10px;padding:2px 8px;background:transparent;border:1px solid var(--t3);border-radius:5px;color:var(--t3);cursor:pointer;font-family:'Noto Sans KR',sans-serif;">확인</button>
+    </div>`
+  ).join('');
+}
+
+function dismissIncomplete(name, key){
+  const list = JSON.parse(localStorage.getItem(key) || '[]');
+  const newList = list.filter(n => n !== name);
+  if(!newList.length) localStorage.removeItem(key);
+  else localStorage.setItem(key, JSON.stringify(newList));
+  renderIncomplete();
+}
+
+// ══ 오늘 배차 알림 표시 ══
+function renderTodayDispatch(){
+  const empName = typeof EMP !== 'undefined' ? EMP : '';
+  const wd = typeof workDate === 'function' ? workDate() : new Date().toISOString().slice(0,10);
+  const sec = document.getElementById('today-dispatch-section');
+  if(!sec) return;
+
+  const _stores = typeof stores !== 'undefined' ? stores : [];
+  const todayDisp = _stores.filter(s =>
+    s.배정날짜 === wd &&
+    (s.배정직원 === empName || s.담당 === empName) &&
+    s.배정상태 === '긴급배정' &&
+    s.상태 !== '비활성'
+  );
+
+  if(!todayDisp.length){ sec.style.display='none'; return; }
+
+  sec.style.display='block';
+  const listEl = document.getElementById('today-dispatch-list');
+  if(listEl){
+    listEl.innerHTML = todayDisp.map(s => {
+      const typeTag = s.배정타입 === '신규등록'
+        ? '<span style="font-size:9px;background:rgba(61,220,132,.15);color:var(--g);border-radius:4px;padding:1px 6px;margin-left:4px;">🆕신규</span>'
+        : '<span style="font-size:9px;background:rgba(240,165,0,.15);color:var(--y);border-radius:4px;padding:1px 6px;margin-left:4px;">1회</span>';
+      return `<div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:12px;">
+        <span>${s.이름}</span>${typeTag}
+        ${s.유종?`<span style="font-size:10px;color:var(--t3);margin-left:6px;">${s.유종}</span>`:''}
+      </div>`;
+    }).join('');
+  }
+}

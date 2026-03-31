@@ -102,7 +102,7 @@ select option{background:#161b22;}
 .store-badge.none{background:var(--card2);color:var(--t3);}
 .store-badge.day{background:rgba(63,185,80,.08);color:var(--g);}
 .store-badge.misu{background:rgba(248,81,73,.1);color:var(--r);}
-.filter-row{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;}
+.filter-row{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;}
 .filter-btn{padding:7px 13px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:var(--card);color:var(--t3);white-space:nowrap;font-family:'Noto Sans KR',sans-serif;}
 .filter-btn.on{background:rgba(240,165,0,.1);color:var(--y);border-color:var(--y);}
 .search-wrap{position:relative;margin-bottom:10px;}
@@ -148,7 +148,6 @@ select option{background:#161b22;}
 <div class="tabs">
   <div class="tab on"  onclick="goTab('dashboard')">📊 현황</div>
   <div class="tab"     onclick="goTab('history')">📋 내역</div>
-  <div class="tab"     onclick="goTab('dispatch')">🚗 배차</div>
   <div class="tab"     onclick="goTab('stores')">🏪 거래처</div>
   <div class="tab"     onclick="goTab('prices')">💰 단가</div>
 </div>
@@ -186,7 +185,10 @@ select option{background:#161b22;}
   <div class="sec-label">직원 정산 현황</div>
   <div id="settlement-list" style="margin-bottom:4px"></div>
   <div class="divider"></div>
-  <div class="sec-label">미수금 거래처 <span style="color:var(--t3);font-weight:400">탭하면 상세</span></div>
+  <div class="sec-label" style="display:flex;justify-content:space-between;align-items:center;">
+  <span>미수금 거래처</span>
+  <button onclick="openMisuReport()" style="font-size:11px;padding:4px 10px;background:rgba(255,107,107,.1);border:1px solid var(--r);border-radius:7px;color:var(--r);cursor:pointer;font-family:'Noto Sans KR',sans-serif;font-weight:700;">📊 리포트</button>
+</div>
   <div id="misu-list" style="margin-bottom:16px"></div>
   <div class="divider"></div>
   <div class="sec-label">일자별 써머리 <span style="color:var(--t3);font-weight:400">(탭 눌러서 펼치기)</span></div>
@@ -262,89 +264,121 @@ select option{background:#161b22;}
 </div>
 
 <!-- 거래처 -->
-<!-- 배차 -->
-<div class="page" id="page-dispatch">
-  <div class="page-hdr">
-    <div class="page-title">🚗 배차 관리</div>
-    <div style="font-size:11px;color:var(--t2);" id="dispatch-date"></div>
-  </div>
-
-  <!-- 배차 입력 카드 -->
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;">
-    <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px;letter-spacing:.08em;">직원 선택</div>
-    <div style="display:flex;gap:6px;margin-bottom:10px;">
-      <div id="dbtn-손호영" onclick="selectDispatchEmp('손호영')"
-        style="flex:1;padding:11px;text-align:center;border-radius:10px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">
-        👤 손호영
-      </div>
-      <div id="dbtn-박기빈" onclick="selectDispatchEmp('박기빈')"
-        style="flex:1;padding:11px;text-align:center;border-radius:10px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">
-        👤 박기빈
-      </div>
-    </div>
-    <input type="hidden" id="dispatch-emp" value="">
-
-    <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px;letter-spacing:.08em;">거래처 검색</div>
-    <div style="position:relative;margin-bottom:8px;">
-      <input type="text" id="dispatch-store-q" placeholder="거래처 검색 또는 신규 입력..."
-        style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
-        oninput="onDispatchSearch()" onfocus="onDispatchSearch()"
-        onblur="setTimeout(()=>document.getElementById('dispatch-dd').style.display='none',150)"
-        autocomplete="off">
-      <div id="dispatch-dd" style="position:absolute;top:100%;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:10px;z-index:100;max-height:200px;overflow-y:auto;display:none;margin-top:2px;"></div>
-    </div>
-
-    <!-- 거래처 정보 수정 패널 -->
-    <div id="dispatch-info-panel" style="display:none;background:var(--card2);border:1.5px solid var(--p);border-radius:10px;padding:12px;margin-bottom:10px;">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <div style="font-size:11px;font-weight:700;color:var(--p);" id="dispatch-panel-label">거래처 정보 확인/수정</div>
-        <div id="dispatch-new-badge" style="display:none;font-size:10px;background:rgba(61,220,132,.15);color:var(--g);border:1px solid var(--g);border-radius:6px;padding:2px 7px;font-weight:700;">🆕 신규</div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-        <div>
-          <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">유종</div>
-          <input type="text" id="dispatch-유종" placeholder="예: 하이골드"
-            style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;">
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">방문요일</div>
-          <select id="dispatch-요일"
-            style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;-webkit-appearance:none;">
-            <option value="">없음</option>
-            <option>월</option><option>화</option><option>수</option><option>목</option><option>금</option>
-          </select>
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">연락처</div>
-          <input type="text" id="dispatch-연락처" placeholder="010-0000-0000"
-            style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;">
-        </div>
-        <div>
-          <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">입금자명</div>
-          <input type="text" id="dispatch-입금자" placeholder="통장에 찍히는 이름"
-            style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;">
-        </div>
-      </div>
-    </div>
-
-    <button onclick="addDispatch()"
-      style="width:100%;padding:13px;background:var(--p2);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
-      + 배차 추가
-    </button>
-  </div>
-
-  <!-- 오늘 배차 목록 -->
-  <div style="font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.1em;margin-bottom:8px;">오늘 배차 현황</div>
-  <div id="dispatch-list"></div>
-</div>
-
 <div class="page" id="page-stores">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 4px">
     <div class="page-title">🏪 거래처 관리</div>
-    <button onclick="openStoreAdd()" style="padding:9px 16px;background:var(--p2);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">+ 추가</button>
+    <button onclick="openStoreAdd()" style="padding:9px 14px;background:var(--y2);border:none;border-radius:10px;color:#000;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">+ 추가</button>
   </div>
-  <!-- 통계 바 -->
-  <div id="store-stats-bar" style="display:flex;gap:6px;margin-bottom:12px;"></div>
+
+    <!-- 배차 섹션 -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:700;color:var(--y);">🚗 오늘 배차</div>
+      <div style="font-size:11px;color:var(--t2);" id="dispatch-date"></div>
+    </div>
+
+    <!-- 배차 입력 -->
+    <div id="dispatch-form" style="margin-bottom:10px;">
+
+      <!-- 날짜 + 타입 선택 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px;">
+        <!-- 날짜 선택 -->
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:4px;">배차 날짜</div>
+          <div style="display:flex;gap:4px;">
+            <button id="ddate-today" onclick="setDispatchDate('today')"
+              style="flex:1;padding:7px 4px;border-radius:7px;border:1.5px solid var(--p);background:rgba(108,143,255,.1);color:var(--p);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">오늘</button>
+            <button id="ddate-tomorrow" onclick="setDispatchDate('tomorrow')"
+              style="flex:1;padding:7px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">내일</button>
+            <button id="ddate-custom" onclick="setDispatchDate('custom')"
+              style="flex:1;padding:7px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">직접</button>
+          </div>
+          <input type="date" id="ddate-input" style="display:none;width:100%;margin-top:4px;background:var(--bg);border:1.5px solid var(--p);border-radius:7px;padding:6px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+            onchange="onDispatchDateInput()">
+          <div id="ddate-display" style="font-size:10px;color:var(--p);margin-top:3px;font-weight:600;"></div>
+        </div>
+        <!-- 배차 타입 -->
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:4px;">배차 타입</div>
+          <div style="display:flex;gap:4px;">
+            <button id="dtype-once" onclick="setDispatchType('일회성')"
+              style="flex:1;padding:7px 4px;border-radius:7px;border:1.5px solid var(--y);background:rgba(240,165,0,.1);color:var(--y);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">1회</button>
+            <button id="dtype-new" onclick="setDispatchType('신규등록')"
+              style="flex:1;padding:7px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">신규</button>
+          </div>
+          <div id="dtype-display" style="font-size:10px;color:var(--y);margin-top:3px;font-weight:600;">일회성 납품</div>
+        </div>
+      </div>
+
+      <!-- 거래처 검색 + 직원 선택 -->
+      <div style="display:flex;gap:6px;margin-bottom:8px;">
+        <div style="flex:1;position:relative;">
+          <input type="text" id="dispatch-store-q" placeholder="거래처 검색 또는 신규 입력..."
+            style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+            oninput="onDispatchSearch()" onfocus="onDispatchSearch()"
+            onblur="setTimeout(()=>document.getElementById('dispatch-dd').style.display='none',150)"
+            autocomplete="off">
+          <div id="dispatch-dd" style="position:absolute;top:100%;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:9px;z-index:100;max-height:160px;overflow-y:auto;display:none;margin-top:2px;"></div>
+        </div>
+        <div style="display:flex;gap:5px;">
+          <div id="dbtn-손호영" onclick="selectDispatchEmp('손호영')"
+            style="padding:9px 10px;text-align:center;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;white-space:nowrap;">
+            손호영
+          </div>
+          <div id="dbtn-박기빈" onclick="selectDispatchEmp('박기빈')"
+            style="padding:9px 10px;text-align:center;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;white-space:nowrap;">
+            박기빈
+          </div>
+        </div>
+        <input type="hidden" id="dispatch-emp" value="">
+      </div>
+
+      <!-- 거래처 정보 수정 패널 (선택 시 표시) -->
+      <div id="dispatch-info-panel" style="display:none;background:var(--card2);border:1.5px solid var(--p);border-radius:10px;padding:12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <div style="font-size:11px;font-weight:700;color:var(--p);" id="dispatch-panel-label">거래처 정보</div>
+          <div id="dispatch-new-badge" style="display:none;font-size:10px;background:rgba(61,220,132,.15);color:var(--g);border:1px solid var(--g);border-radius:6px;padding:2px 7px;font-weight:700;">🆕 신규</div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div>
+            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">유종</div>
+            <input type="text" id="dispatch-유종"
+              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+              placeholder="예: 하이골드">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">방문요일</div>
+            <select id="dispatch-요일"
+              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;-webkit-appearance:none;">
+              <option value="">없음</option>
+              <option>월</option><option>화</option><option>수</option>
+              <option>목</option><option>금</option>
+            </select>
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">연락처</div>
+            <input type="text" id="dispatch-연락처"
+              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+              placeholder="010-0000-0000">
+          </div>
+          <div>
+            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">입금자명</div>
+            <input type="text" id="dispatch-입금자"
+              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+              placeholder="통장에 찍히는 이름">
+          </div>
+        </div>
+      </div>
+
+      <button onclick="addDispatch()"
+        style="width:100%;padding:11px;background:var(--p2);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+        + 배차 추가
+      </button>
+    </div>
+
+    <!-- 오늘 배차 목록 -->
+    <div id="dispatch-list"></div>
+  </div>
 
   <!-- 검색 -->
   <div class="search-wrap">
@@ -353,13 +387,13 @@ select option{background:#161b22;}
   </div>
 
   <!-- 필터 -->
-  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;">
-    <button class="filter-btn on" onclick="setStoreFilter('전체')" id="fbtn-전체">전체</button>
-    <button class="filter-btn" onclick="setStoreFilter('손호영')" id="fbtn-손호영">손호영</button>
-    <button class="filter-btn" onclick="setStoreFilter('박기빈')" id="fbtn-박기빈">박기빈</button>
-    <button class="filter-btn" onclick="setStoreFilter('미배정')" id="fbtn-미배정">미배정</button>
-    <button class="filter-btn" onclick="setStoreFilter('미수')" id="fbtn-미수">미수있음</button>
-    <button class="filter-btn" onclick="setStoreFilter('비활성')" id="fbtn-비활성">비활성</button>
+  <div class="filter-row">
+    <button class="filter-btn on" onclick="setStoreFilter('전체')">전체</button>
+    <button class="filter-btn" onclick="setStoreFilter('손호영')">손호영</button>
+    <button class="filter-btn" onclick="setStoreFilter('박기빈')">박기빈</button>
+    <button class="filter-btn" onclick="setStoreFilter('공유')">공유</button>
+    <button class="filter-btn" onclick="setStoreFilter('미배정')">미배정</button>
+    <button class="filter-btn" onclick="setStoreFilter('미수')">미수있음</button>
   </div>
 
   <div id="store-count" style="font-size:11px;color:var(--t3);margin-bottom:10px"></div>
@@ -644,16 +678,74 @@ function renderDashboard(){
 
   const el=document.getElementById('misu-list');
   const entries=Object.entries(mm).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
-  el.innerHTML=entries.length
-    ?entries.map(([nm,amt])=>`
-      <div class="misu-item" onclick="openMisuDetail('${nm}')" style="cursor:pointer">
-        <div><div class="misu-name">${nm}</div><div style="font-size:10px;color:var(--t3);margin-top:2px">탭하여 상세보기 →</div></div>
-        <span class="misu-amt">${amt.toLocaleString()}원</span>
-      </div>`).join('')
-    :'<div class="empty"><div class="empty-icon">🎉</div><div style="font-size:13px">미수금 없음</div></div>';
+  
+  if(!entries.length){
+    el.innerHTML='<div class="empty"><div class="empty-icon">🎉</div><div style="font-size:13px">미수금 없음</div></div>';
+  } else {
+    // aging 계산 (FIFO 방식)
+    const todayStr = new Date().toISOString().slice(0,10);
+    const aging = calcMisuAging(entries, todayStr);
+    
+    // 상단 요약 바
+    const total = entries.reduce((s,[,v])=>s+v,0);
+    const over90 = aging.filter(a=>a.maxAge>=90).reduce((s,a)=>s+a.amt,0);
+    const over60 = aging.filter(a=>a.maxAge>=60&&a.maxAge<90).reduce((s,a)=>s+a.amt,0);
+    const over30 = aging.filter(a=>a.maxAge>=30&&a.maxAge<60).reduce((s,a)=>s+a.amt,0);
+    const under30 = aging.filter(a=>a.maxAge<30).reduce((s,a)=>s+a.amt,0);
+    
+    el.innerHTML = `
+      <!-- aging 요약 바 -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px;">
+        ${[
+          {label:'30일 이내', amt:under30, color:'var(--t2)'},
+          {label:'30~60일', amt:over30, color:'var(--y)'},
+          {label:'60~90일', amt:over60, color:'var(--o)'},
+          {label:'90일+', amt:over90, color:'var(--r)'},
+        ].map(b=>`<div style="text-align:center;background:var(--card2);border-radius:8px;padding:7px 4px;">
+          <div style="font-size:13px;font-weight:900;color:${b.color};">${b.amt>0?Math.round(b.amt/10000)+'만':'0'}</div>
+          <div style="font-size:9px;color:var(--t3);margin-top:2px;">${b.label}</div>
+        </div>`).join('')}
+      </div>
+      <!-- 거래처 목록 -->
+      ${aging.map(a=>{
+        const s = allStores.find(x=>x.이름===a.name);
+        const limit = s?.미수한도||0;
+        const overLimit = limit>0 && a.amt>limit;
+        const ageColor = a.maxAge>=90?'var(--r)':a.maxAge>=60?'var(--o)':a.maxAge>=30?'var(--y)':'var(--t2)';
+        return `<div class="misu-item" onclick="openMisuDetail('${a.name.replace(/'/g,"\'")}')">
+          <div style="flex:1;min-width:0;">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <span class="misu-name">${a.name}</span>
+              ${overLimit?'<span style="font-size:9px;background:rgba(255,107,107,.15);color:var(--r);border-radius:4px;padding:1px 5px;font-weight:700;">한도초과</span>':''}
+            </div>
+            <div style="font-size:10px;color:${ageColor};margin-top:2px;">${a.maxAge}일 경과</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="misu-amt" style="color:${overLimit?'var(--r)':'var(--r)'};">${a.amt.toLocaleString()}원</div>
+            ${limit>0?`<div style="font-size:9px;color:var(--t3);">한도 ${limit.toLocaleString()}원</div>`:''}
+          </div>
+        </div>`;
+      }).join('')}`;
+  }
 
   renderDaySummary();
 }
+
+// 미수금 aging 계산 (FIFO)
+function calcMisuAging(entries, todayStr){
+  return entries.map(([name, amt])=>{
+    // 해당 거래처 tx에서 미수 날짜 찾기
+    const txs = allTx.filter(t=>t.거래처===name && t.미수 && t.차감청구>0)
+                     .sort((a,b)=>a.날짜?.localeCompare(b.날짜));
+    if(!txs.length) return {name, amt, maxAge:0};
+    
+    // 가장 오래된 미수 날짜
+    const oldest = txs[0].날짜||todayStr;
+    const maxAge = Math.floor((new Date(todayStr)-new Date(oldest))/86400000);
+    return {name, amt, maxAge};
+  }).sort((a,b)=>b.maxAge-a.maxAge||b.amt-a.amt);
+}
+
 
 function renderDaySummary(){
   const byDate={};
@@ -768,11 +860,9 @@ async function runAutoAssign(){
 function setStoreFilter(f){
   storeFilter=f;
   document.querySelectorAll('.filter-btn').forEach(b=>{
-    b.classList.remove('on');
+    const label=b.textContent.replace('미수있음','미수');
+    b.classList.toggle('on', label===f||b.textContent===f);
   });
-  const activeBtn = document.getElementById('fbtn-'+f) || 
-    document.querySelector(`.filter-btn[onclick*="'${f}'"]`);
-  if(activeBtn) activeBtn.classList.add('on');
   renderStores();
 }
 
@@ -787,10 +877,6 @@ function renderStores(){
   else if(storeFilter==='공유') list=list.filter(s=>s.담당==='공유');
   else if(storeFilter==='미배정') list=list.filter(s=>!s.담당||s.담당==='');
   else if(storeFilter==='미수') list=list.filter(s=>(misuMap[s.이름]||0)>0);
-  else if(storeFilter==='비활성') list=list.filter(s=>s.상태==='비활성');
-
-  // 기본(전체)이면 비활성 제외
-  if(storeFilter==='전체'||!storeFilter) list=list.filter(s=>s.상태!=='비활성');
 
   list.sort((a,b)=>{
     const am=misuMap[a.이름]||0, bm=misuMap[b.이름]||0;
@@ -800,25 +886,6 @@ function renderStores(){
   });
 
   document.getElementById('store-count').textContent=`총 ${list.length}개 거래처`;
-  // 통계 바
-  const statsBar = document.getElementById('store-stats-bar');
-  if(statsBar){
-    const total = allStores.filter(s=>s.상태!=='비활성').length;
-    const sonCnt = allStores.filter(s=>s.담당==='손호영'&&s.상태!=='비활성').length;
-    const bakCnt = allStores.filter(s=>s.담당==='박기빈'&&s.상태!=='비활성').length;
-    const noneCnt = allStores.filter(s=>(!s.담당||s.담당==='')&&s.상태!=='비활성').length;
-    const inactiveCnt = allStores.filter(s=>s.상태==='비활성').length;
-    statsBar.innerHTML = [
-      {label:'전체',val:total,color:'var(--t2)'},
-      {label:'손호영',val:sonCnt,color:'#6c8fff'},
-      {label:'박기빈',val:bakCnt,color:'#3ddc84'},
-      {label:'미배정',val:noneCnt,color:'var(--y)'},
-      {label:'비활성',val:inactiveCnt,color:'var(--r)'},
-    ].map(s=>`<div style="flex:1;text-align:center;background:var(--card2);border-radius:8px;padding:7px 4px;cursor:pointer;" onclick="setStoreFilter('${s.label==='전체'?'전체':s.label}')">
-      <div style="font-size:16px;font-weight:900;color:${s.color};">${s.val}</div>
-      <div style="font-size:9px;color:var(--t3);margin-top:2px;">${s.label}</div>
-    </div>`).join('');
-  }
 
   const el=document.getElementById('store-list');
   if(!list.length){
@@ -841,7 +908,7 @@ function renderStores(){
         </div>`
       : '';
 
-    return `<div class="store-card" style="${s.상태==='비활성'?'opacity:.5;border-style:dashed;':''}">  
+    return `<div class="store-card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div style="flex:1">
           <div class="store-name">${s.이름||''}</div>
@@ -855,12 +922,8 @@ function renderStores(){
           ${cntBar}
           ${s.비고?`<div style="font-size:11px;color:var(--t3);margin-top:5px">📌 ${s.비고}</div>`:''}
         </div>
-        <div style="display:flex;gap:5px;margin-left:8px;flex-direction:column;">
+        <div style="display:flex;gap:5px;margin-left:8px">
           <button class="btn-edit" onclick="openStoreEdit('${s.코드}')">수정</button>
-          ${s.상태==='비활성'
-            ? '<button onclick="toggleStoreActive(\''+s.코드+'\',\'활성\')" style="padding:5px 8px;background:rgba(61,220,132,.1);border:1px solid var(--g);border-radius:7px;color:var(--g);font-size:10px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;white-space:nowrap;">활성화</button>'
-            : '<button onclick="toggleStoreActive(\''+s.코드+'\',\'비활성\')" style="padding:5px 8px;background:rgba(255,107,107,.1);border:1px solid var(--r);border-radius:7px;color:var(--r);font-size:10px;font-weight:700;cursor:pointer;font-family:Noto Sans KR,sans-serif;white-space:nowrap;">비활성</button>'
-          }
         </div>
       </div>
     </div>`;
@@ -1153,13 +1216,11 @@ function toggleCustom(){
 }
 
 // ===== 탭 이동 =====
-const TAB_IDS = ['dashboard','history','dispatch','stores','prices'];
+const TAB_IDS=['dashboard','history','stores','prices'];
 function goTab(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',TAB_IDS[i]===t));
   document.querySelectorAll('.page').forEach((el,i)=>el.classList.toggle('on',`page-${TAB_IDS[i]}`===`page-${t}`));
   if(t==='dashboard') silentRefresh();
-  if(t==='dispatch') initDispatch();
-  if(t==='stores'){ renderStores(); }
   if(t==='history'){
     const hm=document.getElementById('hist-month');
     const dm=document.getElementById('dash-month').value;
@@ -1280,13 +1341,61 @@ setInterval(()=>{
 },30000);
 
 // ══════════════ 월마감 ══════════════
+
+// ══ 월마감 전 검증 ══
+async function checkBeforeClose(monthVal, emp){
+  const warnings = [];
+  const [y, m] = monthVal.split('-').map(Number);
+
+  try{
+    // GAS에서 해당 월 데이터 조회
+    const res = await fetch(`${API}?type=tx&year=${y}&month=${m}${emp?'&emp='+emp:''}`);
+    const d = await res.json();
+    const txList = d.tx || d.data || [];
+
+    // 1. 데이터 건수
+    if(txList.length === 0){
+      warnings.push('📭 해당 월 납품 데이터가 없어요.');
+    }
+
+    // 2. 미수금 잔액 확인
+    const res2 = await fetch(`${API}?type=misu&year=${y}&month=${m}`);
+    const d2 = await res2.json();
+    const misuTotal = d2.total || 0;
+    if(misuTotal > 0){
+      warnings.push(`💰 미수금 잔액 ${misuTotal.toLocaleString()}원이 남아있어요.`);
+    }
+
+    // 3. 날짜 이상 데이터 (해당 월 범위 벗어난 것)
+    const startDate = `${y}-${String(m).padStart(2,'0')}-01`;
+    const endDate = `${y}-${String(m).padStart(2,'0')}-31`;
+    const outOfRange = txList.filter(tx => tx.날짜 < startDate || tx.날짜 > endDate);
+    if(outOfRange.length > 0){
+      warnings.push(`📅 날짜 범위 벗어난 데이터 ${outOfRange.length}건 있어요.`);
+    }
+
+  }catch(e){
+    warnings.push('⚠️ 검증 중 오류 발생 - 네트워크 확인 필요');
+  }
+
+  return warnings;
+}
+
 async function runMonthlyClose(){
   const monthVal=document.getElementById('close-month').value;
   const emp=document.getElementById('close-emp').value||'';
   if(!monthVal){showToast('마감할 월을 선택해주세요');return;}
   const [y,m]=monthVal.split('-');
   const empLabel=emp||'전체 직원';
-  if(!confirm(`${monthVal} ${empLabel} 월마감을 실행할까요?\n\n마감 후 취소 불가합니다.`))return;
+
+  // ══ 마감 전 검증 ══
+  const warnings = await checkBeforeClose(monthVal, emp);
+  if(warnings.length > 0){
+    const warnMsg = warnings.join('\n');
+    if(!confirm(`⚠️ 마감 전 확인사항:\n\n${warnMsg}\n\n그래도 마감할까요?`)) return;
+  } else {
+    if(!confirm(`${monthVal} ${empLabel} 월마감을 실행할까요?\n\n마감 후 취소 불가합니다.`))return;
+  }
   const btn=document.querySelector('[onclick="runMonthlyClose()"]');
   btn.disabled=true;btn.textContent='⏳ 마감 중...';
   try{
@@ -1700,6 +1809,11 @@ function showAddEmpForm(){
 let dispatchList = JSON.parse(localStorage.getItem('dispatch_today_v1') || '[]');
 
 function initDispatch(){
+  // 날짜/타입 기본값 초기화
+  _dispatchDate = new Date().toISOString().slice(0,10);
+  _dispatchType = '일회성';
+  setDispatchDate('today');
+  setDispatchType('일회성');
   const t = new Date().toISOString().slice(0,10);
   const el = document.getElementById('dispatch-date');
   if(el) el.textContent = t;
@@ -1772,21 +1886,79 @@ function onDispatchSearch(){
   dd.style.display = 'block';
 }
 
-function selectDispatchStore(name, isExisting){
-  const el = document.getElementById('dispatch-store-q');
-  if(el) el.value = name;
-  const dd = document.getElementById('dispatch-dd');
-  if(dd) dd.style.display = 'none';
-  // 신규거래처면 표시
-  const badge = document.getElementById('dispatch-new-badge');
-  if(badge) badge.style.display = isExisting ? 'none' : 'inline-block';
+// ══ 배차 날짜/타입 관리 ══
+let _dispatchDate = new Date().toISOString().slice(0,10); // 기본: 오늘
+let _dispatchType = '일회성'; // 기본: 일회성
+
+function setDispatchDate(mode){
+  const today = new Date().toISOString().slice(0,10);
+  const tomorrow = new Date(Date.now()+86400000).toISOString().slice(0,10);
+  const inp = document.getElementById('ddate-input');
+  const display = document.getElementById('ddate-display');
+
+  ['today','tomorrow','custom'].forEach(id => {
+    const btn = document.getElementById('ddate-'+id);
+    if(!btn) return;
+    const on = id === mode;
+    btn.style.borderColor = on ? 'var(--p)' : 'var(--border)';
+    btn.style.background = on ? 'rgba(108,143,255,.1)' : 'var(--card2)';
+    btn.style.color = on ? 'var(--p)' : 'var(--t2)';
+  });
+
+  if(mode === 'today'){
+    _dispatchDate = today;
+    if(inp) inp.style.display='none';
+    if(display) display.textContent = today;
+  } else if(mode === 'tomorrow'){
+    _dispatchDate = tomorrow;
+    if(inp) inp.style.display='none';
+    if(display) display.textContent = tomorrow;
+  } else {
+    if(inp){ inp.style.display='block'; inp.value=_dispatchDate; }
+    if(display) display.textContent = '';
+  }
+}
+
+function onDispatchDateInput(){
+  const val = document.getElementById('ddate-input')?.value;
+  if(val){
+    _dispatchDate = val;
+    const display = document.getElementById('ddate-display');
+    if(display) display.textContent = val;
+  }
+}
+
+function setDispatchType(type){
+  _dispatchType = type;
+  const display = document.getElementById('dtype-display');
+
+  ['once','new'].forEach(id => {
+    const btn = document.getElementById('dtype-'+id);
+    if(!btn) return;
+    const typeMap = {once:'일회성', new:'신규등록'};
+    const on = typeMap[id] === type;
+    if(id === 'once'){
+      btn.style.borderColor = on ? 'var(--y)' : 'var(--border)';
+      btn.style.background = on ? 'rgba(240,165,0,.1)' : 'var(--card2)';
+      btn.style.color = on ? 'var(--y)' : 'var(--t2)';
+    } else {
+      btn.style.borderColor = on ? 'var(--g)' : 'var(--border)';
+      btn.style.background = on ? 'rgba(61,220,132,.1)' : 'var(--card2)';
+      btn.style.color = on ? 'var(--g)' : 'var(--t2)';
+    }
+  });
+
+  if(display){
+    display.textContent = type === '일회성' ? '일회성 납품' : '신규 거래처 등록';
+    display.style.color = type === '일회성' ? 'var(--y)' : 'var(--g)';
+  }
 }
 
 
 function selectDispatchEmp(name){
   document.getElementById('dispatch-emp').value = name;
   ['손호영','박기빈'].forEach(n => {
-    const btn = document.getElementById('dbtn-' + n);
+    const btn = document.getElementById('dbtn-'+n);
     if(!btn) return;
     const on = n === name;
     btn.style.borderColor = on ? 'var(--p)' : 'var(--border)';
@@ -1806,7 +1978,9 @@ async function addDispatch(){
   if(!storeName){ showToast('거래처를 선택하거나 입력해주세요'); return; }
   if(!empName){ showToast('직원을 선택해주세요'); return; }
 
-  const t = new Date().toISOString().slice(0,10);
+  // 날짜/타입
+  const t = _dispatchDate || new Date().toISOString().slice(0,10);
+  const dispatchType = _dispatchType || '일회성';
 
   if(dispatchList.find(d => d.거래처 === storeName && d.직원 === empName)){
     showToast('이미 배차됐어요'); return;
@@ -1816,7 +1990,7 @@ async function addDispatch(){
   const isNew = !existingStore;
 
   const dispatch = {
-    거래처: storeName, 직원: empName, 날짜: t,
+    거래처: storeName, 직원: empName, 날짜: t, 타입: dispatchType,
     시간: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}),
     완료: false, isNew
   };
@@ -1830,6 +2004,7 @@ async function addDispatch(){
       배정상태: '긴급배정',
       배정직원: empName,
       배정날짜: t,
+      배정타입: dispatchType,
     };
     if(유종) updateData.유종 = 유종;
     if(요일) updateData.요일 = 요일;
@@ -1858,6 +2033,7 @@ async function addDispatch(){
       배정상태: '긴급배정',
       배정직원: empName,
       배정날짜: t,
+      배정타입: dispatchType,
       지사: '본사',
     };
     allStores.push(newStore);
@@ -1951,27 +2127,126 @@ setTimeout(()=>{
     if(sub)sub.textContent='연결이 오래 걸리고 있어요';
   }
 },10000);
-async function toggleStoreActive(코드, 상태){
-  const s = allStores.find(x=>x.코드===코드);
-  if(!s) return;
-  const msg = 상태==='비활성' ? `"${s.이름}" 비활성 처리할까요?` : `"${s.이름}" 다시 활성화할까요?`;
-  if(!confirm(msg)) return;
+// ══ 미수금 리포트 ══
+function openMisuReport(){
+  const modal = document.getElementById('misu-report-modal');
+  if(!modal) return;
+  modal.style.display = 'block';
+  renderMisuReport();
+}
 
-  s.상태 = 상태;
-  try{
-    await fetch(API, {
-      method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({
-        type: 상태==='비활성' ? 'store_deactivate' : 'store_activate',
-        코드, 이름: s.이름
-      })
-    });
-    showToast(상태==='비활성' ? '비활성 처리됨' : '활성화됨');
-  }catch(e){
-    showToast('⚠️ 서버 저장 실패 - 로컬에만 반영');
+function renderMisuReport(){
+  const mm = misuMap || calcMisuMap();
+  const entries = Object.entries(mm).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const todayStr = new Date().toISOString().slice(0,10);
+  
+  const summaryEl = document.getElementById('misu-report-summary');
+  const agingEl = document.getElementById('misu-report-aging');
+  const listEl = document.getElementById('misu-report-list');
+  if(!summaryEl||!agingEl||!listEl) return;
+
+  if(!entries.length){
+    summaryEl.innerHTML = '<div style="text-align:center;padding:20px;color:var(--g);font-size:15px;font-weight:700;">🎉 미수금 없음</div>';
+    agingEl.innerHTML = '';
+    listEl.innerHTML = '';
+    return;
   }
-  renderStores();
+
+  const aging = typeof calcMisuAging === 'function' ? calcMisuAging(entries, todayStr) : entries.map(([n,a])=>({name:n,amt:a,maxAge:0}));
+  const total = entries.reduce((s,[,v])=>s+v,0);
+  
+  // aging 분류
+  const buckets = [
+    {label:'30일 이내', min:0, max:29, color:'#6c8fff'},
+    {label:'30~60일', min:30, max:59, color:'var(--y)'},
+    {label:'60~90일', min:60, max:89, color:'var(--o)'},
+    {label:'90일+', min:90, max:9999, color:'var(--r)'},
+  ];
+  const bucketData = buckets.map(b=>({
+    ...b,
+    amt: aging.filter(a=>a.maxAge>=b.min&&a.maxAge<=b.max).reduce((s,a)=>s+a.amt,0),
+    cnt: aging.filter(a=>a.maxAge>=b.min&&a.maxAge<=b.max).length,
+  }));
+
+  // 요약
+  const overLimit = aging.filter(a=>{
+    const s = allStores.find(x=>x.이름===a.name);
+    return s?.미수한도>0 && a.amt>s.미수한도;
+  });
+
+  summaryEl.innerHTML = `
+    <div style="background:var(--card2);border-radius:12px;padding:14px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="color:var(--t2);font-size:12px;">전체 미수금</span>
+        <span style="font-size:18px;font-weight:900;color:var(--r);">${total.toLocaleString()}원</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:12px;">
+        <span style="color:var(--t2);">미수 거래처</span>
+        <span style="font-weight:700;">${entries.length}곳</span>
+      </div>
+      ${overLimit.length>0?`<div style="margin-top:8px;padding:6px 10px;background:rgba(255,107,107,.1);border-radius:8px;font-size:11px;color:var(--r);font-weight:700;">⚠️ 한도초과 ${overLimit.length}곳: ${overLimit.map(a=>a.name).join(', ')}</div>`:''}
+    </div>`;
+
+  // aging 바 차트
+  agingEl.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.08em;margin-bottom:8px;">연령 분석</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:10px;">
+      ${bucketData.map(b=>`
+        <div style="background:var(--card2);border-radius:10px;padding:10px 6px;text-align:center;">
+          <div style="font-size:15px;font-weight:900;color:${b.color};">${b.amt>0?Math.round(b.amt/10000)+'만':'0'}</div>
+          <div style="font-size:9px;color:var(--t3);margin-top:3px;">${b.label}</div>
+          <div style="font-size:9px;color:var(--t3);">${b.cnt}곳</div>
+        </div>`).join('')}
+    </div>
+    <div style="height:8px;border-radius:4px;overflow:hidden;display:flex;gap:1px;margin-bottom:4px;">
+      ${bucketData.filter(b=>b.amt>0).map(b=>`<div style="flex:${b.amt};background:${b.color};"></div>`).join('')}
+    </div>`;
+
+  // 거래처 목록
+  listEl.innerHTML = `
+    <div style="font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.08em;margin-bottom:8px;">거래처별 미수 현황</div>
+    ${aging.map(a=>{
+      const s = allStores.find(x=>x.이름===a.name);
+      const limit = s?.미수한도||0;
+      const overLim = limit>0 && a.amt>limit;
+      const ageColor = a.maxAge>=90?'var(--r)':a.maxAge>=60?'var(--o)':a.maxAge>=30?'var(--y)':'var(--t2)';
+      const pct = limit>0 ? Math.min(100, Math.round(a.amt/limit*100)) : 0;
+      return `<div style="background:var(--card2);border-radius:10px;padding:12px;margin-bottom:8px;${overLim?'border:1px solid var(--r);':''}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+          <div>
+            <div style="font-size:13px;font-weight:700;">${a.name}
+              ${overLim?'<span style="font-size:9px;background:rgba(255,107,107,.15);color:var(--r);border-radius:4px;padding:1px 5px;margin-left:4px;">한도초과</span>':''}
+            </div>
+            <div style="font-size:10px;color:${ageColor};margin-top:2px;">최장 ${a.maxAge}일 경과</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:14px;font-weight:900;color:var(--r);">${a.amt.toLocaleString()}원</div>
+            ${limit>0?`<div style="font-size:9px;color:var(--t3);">한도 ${limit.toLocaleString()}원 (${pct}%)</div>`:''}
+          </div>
+        </div>
+        ${limit>0?`<div style="height:4px;background:var(--border);border-radius:2px;overflow:hidden;">
+          <div style="height:100%;width:${pct}%;background:${overLim?'var(--r)':'var(--p)'};border-radius:2px;"></div>
+        </div>`:''}
+      </div>`;
+    }).join('')}`;
 }
 </script>
+
+<!-- 미수금 리포트 모달 -->
+<div id="misu-report-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);overflow-y:auto;">
+  <div style="background:var(--card);border-radius:20px 20px 0 0;padding:20px 18px 44px;width:100%;max-width:480px;margin:40px auto 0;min-height:60vh;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-size:17px;font-weight:900;">💰 미수금 리포트</div>
+      <button onclick="document.getElementById('misu-report-modal').style.display='none'"
+        style="padding:6px 12px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--t2);cursor:pointer;font-family:'Noto Sans KR',sans-serif;">닫기</button>
+    </div>
+    <!-- 요약 -->
+    <div id="misu-report-summary" style="margin-bottom:16px;"></div>
+    <!-- aging 바 차트 -->
+    <div id="misu-report-aging" style="margin-bottom:16px;"></div>
+    <!-- 거래처 목록 -->
+    <div id="misu-report-list"></div>
+  </div>
+</div>
 </body>
 </html>

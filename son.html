@@ -151,9 +151,16 @@ select option{background:#181c24;}
 <!-- 출근 -->
 <div class="page on" id="page-checkin">
   <div class="page-hdr">
-    <div><div class="page-title">🌅 출근</div><div style="font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace" id="ci-date"></div></div>
-    <div id="sync-status" style="font-size:11px;color:var(--t3)">⏳</div>
-    <div id="queue-badge" onclick="flushQueue()" style="display:none;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;border:1px solid;cursor:pointer;margin-left:4px"></div>
+    <div>
+      <div class="page-title">🌅 출근</div>
+      <div style="font-size:11px;color:var(--t3);font-family:'JetBrains Mono',monospace" id="ci-date"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px;">
+      <div id="workdate-badge" style="display:none;font-size:10px;color:var(--g);background:rgba(61,220,132,.1);border:1px solid var(--g);border-radius:8px;padding:3px 8px;font-weight:600;"></div>
+      <button id="clockout-btn" onclick="clockOut()" style="display:none;padding:5px 11px;background:rgba(255,107,107,.1);border:1.5px solid var(--r);border-radius:8px;color:var(--r);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">퇴근</button>
+      <div id="sync-status" style="font-size:11px;color:var(--t3)">⏳</div>
+      <div id="queue-badge" onclick="flushQueue()" style="display:none;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;border:1px solid;cursor:pointer;"></div>
+    </div>
   </div>
 
   <div class="sec-label">♻️ 폐유 계근</div>
@@ -169,7 +176,21 @@ select option{background:#181c24;}
   <div class="divider"></div>
 
   <!-- 기존재고 (전날 이월) -->
-  <div id="carry-over-section" style="display:none;margin-bottom:4px">
+  
+  <div id="incomplete-section" style="display:none;background:rgba(255,107,107,.06);border:1px solid rgba(255,107,107,.2);border-radius:12px;padding:12px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:11px;font-weight:700;color:var(--r);">⚠️ 미완료 거래처</div>
+      <div style="font-size:10px;color:var(--t3);" id="incomplete-date"></div>
+    </div>
+    <div id="incomplete-list"></div>
+  </div>
+
+  <!-- 오늘 배차 -->
+  <div id="today-dispatch-section" style="display:none;background:rgba(240,165,0,.06);border:1px solid rgba(240,165,0,.2);border-radius:12px;padding:12px;margin-bottom:10px;">
+    <div style="font-size:11px;font-weight:700;color:var(--y);margin-bottom:6px;">🚗 오늘 배차</div>
+    <div id="today-dispatch-list"></div>
+  </div>
+<div id="carry-over-section" style="display:none;margin-bottom:4px">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <div class="sec-label" style="margin:0">📦 차량 이월재고</div>
       <span style="font-size:10px;color:var(--t3)">전날 미납품 물량</span>
@@ -229,24 +250,16 @@ select option{background:#181c24;}
       <div style="font-size:12px;font-weight:700;color:var(--g)" id="route-progress"></div>
     </div>
     <div id="route-list"></div>
-    <!-- 신규 거래처 등록 버튼 -->
-    <div style="display:flex;gap:8px;margin-top:8px;margin-bottom:60px;">
-      <button onclick="openNewStoreQuick()" style="flex:1;padding:11px;background:rgba(61,220,132,.08);border:1.5px solid var(--g);border-radius:11px;color:var(--g);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
-        ➕ 신규 거래처 등록
-      </button>
-      <button onclick="showDeliveryForm(null)" style="flex:1;padding:11px;background:rgba(108,143,255,.08);border:1.5px solid var(--p);border-radius:11px;color:var(--p);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
-        📦 추가 납품
-      </button>
-    </div>
+    <button class="btn-add" style="margin-top:4px;margin-bottom:60px" onclick="showDeliveryForm(null)">+ 신규 / 추가 납품</button>
   </div>
 
   <!-- 납품탭 하단 고정 현황바 -->
   <div id="daily-bar" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;background:var(--card);border-top:1px solid var(--border);padding:10px 16px;z-index:50;display:none">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
       <div>
-        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">🏪 납품완료</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--g)" id="bar-loaded">-</div>
-        <div style="font-size:9px;color:var(--t3)">곳</div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">📦 상차</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--p)" id="bar-loaded">-</div>
+        <div style="font-size:9px;color:var(--t3)">통</div>
       </div>
       <div>
         <div style="font-size:10px;color:var(--t3);margin-bottom:2px">✅납품 / 🔲잔여</div>
@@ -493,16 +506,14 @@ select option{background:#181c24;}
       <div style="font-size:11px;color:var(--t3)" id="hist-month-label"></div>
     </div>
   </div>
-  <!-- 날짜 선택 — 통합 -->
-  <div style="margin-bottom:10px;">
+  <!-- 날짜 선택 -->
+  <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+    <input type="month" id="hist-month-sel"
+      style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
+      onchange="onHistMonthChange()">
     <input type="date" id="hist-date-sel"
-      style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--t);font-size:14px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;-webkit-appearance:none;"
+      style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
       onchange="onHistDateChange()">
-    <div style="display:flex;gap:6px;margin-top:6px;">
-      <button onclick="histGoMonth(-1)" style="flex:1;padding:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">◀ 이전달</button>
-      <button onclick="histGoToday()" style="flex:1;padding:8px;background:rgba(108,143,255,.1);border:1px solid var(--p);border-radius:8px;color:var(--p);font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">오늘</button>
-      <button onclick="histGoMonth(1)" style="flex:1;padding:8px;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">다음달 ▶</button>
-    </div>
   </div>
   <!-- 명세서 일괄 발송 버튼 -->
   <div id="batch-receipt-wrap" style="display:none;margin-bottom:10px">
@@ -584,7 +595,7 @@ let priceHistory=JSON.parse(localStorage.getItem('priceHistory_v3')||'[]');
 let wastePriceHistory=JSON.parse(localStorage.getItem('wastePriceHistory_v3')||'[]');
 let txList=JSON.parse(localStorage.getItem(`tx_${EMP}_v3`)||'[]');
 let todayPayments=JSON.parse(localStorage.getItem(`pay_${EMP}_today`)||'[]');
-let completedRoutes=JSON.parse(localStorage.getItem(`done_${EMP}_${today()}`)||'[]');
+let completedRoutes=JSON.parse(localStorage.getItem(`done_${EMP}_${workDate()}`)||'[]');
 let routeOrder=JSON.parse(localStorage.getItem(`route_order_${EMP}`)||'[]');
 
 // ── 날짜 넘어갈 때 자동 초기화 ──
@@ -613,6 +624,25 @@ let pallets=[],cargos=[],items=[],wasteOn=false,curStore=null,curPay='';
 let palletId=0,cargoId=0,itemId=0;
 
 function today(){return new Date().toISOString().slice(0,10);}
+// ══ 마감 월 체크 ══
+async function isMonthClosed(dateStr){
+  try{
+    const [y,m] = dateStr.split('-');
+    const res = await fetch(`${API}?type=is_closed&year=${y}&month=${m}`);
+    const d = await res.json();
+    return d.closed === true;
+  }catch(e){
+    return false; // 네트워크 오류 시 차단 안함
+  }
+}
+
+function workDate(){
+  const wd=localStorage.getItem(`workDate_${EMP}`);
+  return wd||today();
+}
+function setWorkDate(date){localStorage.setItem(`workDate_${EMP}`,date||today());}
+function clearWorkDate(){localStorage.removeItem(`workDate_${EMP}`);}
+
 
 // ── 단가 시점 조회 ──
 function getPriceAt(품명,날짜){
@@ -797,6 +827,14 @@ async function init(){
       localStorage.setItem('wastePriceHistory_v3',JSON.stringify(wastePriceHistory));
     }
     document.getElementById('sync-status').textContent='✅';
+    (function(){
+      const _wd=localStorage.getItem(`workDate_${EMP}`);
+      const _wb=document.getElementById('workdate-badge');
+      const _cb=document.getElementById('clockout-btn');
+      if(_wd){if(_wb){_wb.style.display='block';_wb.textContent=`📅 ${_wd}`;}if(_cb)_cb.style.display='block';}
+      if(typeof renderIncomplete==='function')renderIncomplete();
+      if(typeof renderTodayDispatch==='function')renderTodayDispatch();
+    })();
     document.getElementById('sync-status').title='서버 연결됨';
     // 계좌 정보 로드
     if(cd.config) {
@@ -837,25 +875,8 @@ function buildPayStore(){} // 검색방식으로 변경
 function goTab(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',['checkin','delivery','payment','history','prices'][i]===t));
   document.querySelectorAll('.page').forEach((el,i)=>el.classList.toggle('on',['page-checkin','page-delivery','page-payment','page-history','page-prices'][i]===`page-${t}`));
-  if(t==='delivery'){
-    // delivery-form 닫기 + route-section 강제 복원
-    const rf = document.getElementById('delivery-form');
-    const rs = document.getElementById('route-section');
-    if(rf) rf.style.display='none';
-    if(rs) rs.style.display='block';
-    // 인라인 폼 모두 닫기
-    document.querySelectorAll('.inline-delivery-form').forEach(f=>f.remove());
-    hideDeliveryForm();
-    renderRoute();
-    document.getElementById('daily-bar').style.display='block';
-  }
-  else{
-    document.getElementById('daily-bar').style.display='none';
-    // 납품폼이 열려있으면 닫기 (탭 이동 시 자동 닫힘)
-    const rf2 = document.getElementById('delivery-form');
-    const rs2 = document.getElementById('route-section');
-    if(rf2 && rf2.style.display!=='none'){ rf2.style.display='none'; if(rs2) rs2.style.display='block'; }
-  }
+  if(t==='delivery'){hideDeliveryForm();renderRoute();document.getElementById('daily-bar').style.display='block';}
+  else{document.getElementById('daily-bar').style.display='none';}
   if(t==='payment'){renderTodayPayments();calcSettlement();renderMonthlySettle();}
   if(t==='history')renderHistory();
   if(t==='prices')renderPriceTab();
@@ -1159,13 +1180,14 @@ function calcStockSummary(){
 }
 
 async function saveCheckin(){
+  setWorkDate(today());
   const validPallets=pallets.filter(p=>p.총중량>0&&p.캔수>0);
   const validCargos=cargos.filter(c=>c.통수>0);
   if(!validPallets.length&&!validCargos.length){showToast('폐유납품 또는 상차를 입력해주세요');return;}
   const wcp=getWastePriceAt(today());
   const totalReal=validPallets.reduce((s,p)=>s+p.실중량,0);
   const income=Math.round(totalReal*wcp);
-  const t=today();
+  const t=workDate();
   try{
     if(validPallets.length>0){
       const hasExistPallet=validPallets.some(p=>p.기존있음);
@@ -1263,7 +1285,7 @@ function deleteAllCheckin(){
 function getRouteList(){
   const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
   const today_day=DAYS[new Date().getDay()];
-  const skipped=JSON.parse(localStorage.getItem(`skip_${EMP}_${today()}`)||'[]');
+  const skipped=JSON.parse(localStorage.getItem(`skip_${EMP}_${workDate()}`)||'[]');
   // 담당배정 여부 확인
   const hasAssign=stores.some(s=>s.담당);
   const hasDay=stores.some(s=>s.요일);
@@ -1526,8 +1548,6 @@ function onTypeSearch(id){
 
   dd.innerHTML=opts.map(type=>{
     const basePrice=getPriceAt(type,t)||0;
-    const isFeeType=isFeeItem(type,t);
-    const isNegType=basePrice<0;
     let recentPrice=0;
     if(storeName){
       const recentTx=txList.filter(x=>x.거래처===storeName&&x.유종&&x.유종.includes(type))
@@ -1543,13 +1563,11 @@ function onTypeSearch(id){
     }
     const showPrice=recentPrice&&recentPrice!==basePrice;
     const isRec=recommended.has(type);
-    const feeTag=isFeeType?'<span style="font-size:9px;color:var(--o);background:rgba(255,159,67,.1);border-radius:4px;padding:1px 5px;margin-left:4px;">수수료</span>'
-      :isNegType?'<span style="font-size:9px;color:var(--g);background:rgba(61,220,132,.1);border-radius:4px;padding:1px 5px;margin-left:4px;">수입</span>':'';
     return `<div class="type-opt" onmousedown="selectType(${id},'${type}')">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <span>${type}${isRec?'<span style="color:var(--g);font-size:9px;margin-left:4px">★</span>':''}${feeTag}</span>
+        <span>${type}${isRec?'<span style="color:var(--g);font-size:9px;margin-left:4px">★</span>':''}</span>
         <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${showPrice?'var(--y)':'var(--t3)'}">
-          ${isFeeType||isNegType?'':''}${showPrice?recentPrice.toLocaleString():basePrice?basePrice.toLocaleString():'-'}원
+          ${showPrice?recentPrice.toLocaleString():basePrice?basePrice.toLocaleString():'-'}원
           ${showPrice?'<span style="color:var(--t3);font-size:9px"> (최근)</span>':''}
         </span>
       </div>
@@ -1800,7 +1818,9 @@ async function saveDelivery(){
   if(!curStore&&!document.getElementById('chip-name').textContent){showToast('거래처를 선택해주세요');return;}
   if(items.length===0&&!wasteOn){showToast('품목 또는 폐유를 입력해주세요');return;}
   if(!curPay){showToast('수금방법을 선택해주세요');return;}
-  const t=today();
+  const t=workDate();
+  // 마감 월 체크
+  if(typeof isMonthClosed==='function'){const _cl=await isMonthClosed(t);if(_cl){showToast(`⛔ ${t.slice(0,7)} 마감된 월이에요`);return;}}
   const storeName=curStore?.이름||document.getElementById('chip-name').textContent||'임시거래처';
   const oilTotal=items.reduce((s,i)=>isFeeItem(i.type,t)?s:s+i.qty*i.price,0);
   const feeTotal=items.reduce((s,i)=>!isFeeItem(i.type,t)?s:s+i.qty*(getPriceAt(i.type,t)||0),0);
@@ -2060,11 +2080,17 @@ function clearPayStore(){
 // ── 저장 ──
 async function savePayment(overrideData){
   const data=overrideData||null;
+  // 마감 월 체크
+  const _pt = data?.날짜 || workDate();
+  if(typeof isMonthClosed==='function'){
+    const _cl = await isMonthClosed(_pt);
+    if(_cl){ showToast(`⛔ ${_pt.slice(0,7)} 마감된 월이에요`); return; }
+  }
   const store=data?.거래처||(curPayStore?.이름||'');
   const amt=data?.금액||(parseFloat(document.getElementById('pay-amt').value)||0);
   if(!store||!amt){showToast('거래처와 금액을 입력해주세요');return;}
   const payerName=data?.입금자명||document.getElementById('pay-payer').value||'';
-  const payment={id:`pay_${today()}_${EMP}_${Date.now()}`,날짜:data?.날짜||today(),직원:EMP,거래처:store,
+  const payment={id:`pay_${workDate()}_${EMP}_${Date.now()}`,날짜:data?.날짜||workDate(),직원:EMP,거래처:store,
     입금자명:payerName,
     금액:amt,방법:data?.방법||document.getElementById('pay-method').value,
     비고:data?.비고||document.getElementById('pay-note').value};
@@ -2382,35 +2408,29 @@ function getSentMap(){ return JSON.parse(localStorage.getItem(SENT_KEY)||'{}'); 
 function markSent(txId){ const m=getSentMap(); m[txId]=new Date().toISOString(); localStorage.setItem(SENT_KEY,JSON.stringify(m)); }
 function isSent(txId){ return !!getSentMap()[txId]; }
 
+function onHistMonthChange(){
+  // 월 선택 시 일 선택 초기화
+  document.getElementById('hist-date-sel').value='';
+  renderHistory();
+}
 function onHistDateChange(){
+  // 일 선택 시 월을 맞게 업데이트
+  const d=document.getElementById('hist-date-sel').value;
+  if(d){
+    const m=d.slice(0,7);
+    document.getElementById('hist-month-sel').value=m;
+  }
   renderHistory();
 }
-function histGoToday(){
-  const el=document.getElementById('hist-date-sel');
-  if(el){ el.value=new Date().toISOString().slice(0,10); renderHistory(); }
-}
-function histGoMonth(dir){
-  const el=document.getElementById('hist-date-sel');
-  if(!el) return;
-  const cur=el.value||new Date().toISOString().slice(0,10);
-  const d=new Date(cur);
-  d.setMonth(d.getMonth()+dir);
-  el.value=d.toISOString().slice(0,10);
-  renderHistory();
-}
-function onHistMonthChange(){ renderHistory(); }
 
 async function renderHistory(){
   const now=new Date();
   const defaultMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const selEl=document.getElementById('hist-month-sel');
   const dateEl=document.getElementById('hist-date-sel');
-  // 날짜 선택된 경우: 해당 월 표시 / 없으면 이번달
-  const filterDate=dateEl?.value||'';
-  const month=filterDate?filterDate.slice(0,7):defaultMonth;
-  if(dateEl&&!dateEl.value){
-    // 기본값: 오늘
-    dateEl.value=new Date().toISOString().slice(0,10);
-  }
+  if(selEl&&!selEl.value) selEl.value=defaultMonth;
+  const month=selEl?.value||defaultMonth;
+  const filterDate=dateEl?.value||''; // 특정 날짜 필터
   const [yy,mm]=month.split('-');
   const el=document.getElementById('history-list');
   el.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3)">⏳ 불러오는 중...</div>';
@@ -2551,38 +2571,6 @@ async function copyReceipt(){
   document.getElementById('receipt-btn-wrap')?.remove();
 }
 
-
-async function deletePayment(payId, storeName){
-  if(!confirm(`${storeName} 입금을 삭제할까요?`)) return;
-  const now = new Date();
-  try{
-    const res = await fetch(API, {
-      method:'POST', headers:{'Content-Type':'text/plain'},
-      body: JSON.stringify({type:'delete_payment', id: payId,
-        year: now.getFullYear(), month: now.getMonth()+1})
-    });
-    const d = await res.json();
-    if(d.ok === false){ showToast('⚠️ ' + d.error); return; }
-  }catch(e){}
-  todayPayments = todayPayments.filter(p => String(p.id) !== String(payId));
-  localStorage.setItem(`pay_${EMP}_today`, JSON.stringify(todayPayments));
-  showToast('✅ 삭제됐어요');
-  renderTodayPayments();
-  calcSettlement();
-}
-
-
-function downloadTemplate(){
-  const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.aoa_to_sheet([
-    ['날짜', '입금자', '금액'],
-    ['2025-01-01', '홍길동', '100000'],
-    ['2025-01-02', '김철수', '200000'],
-  ]);
-  XLSX.utils.book_append_sheet(wb, ws, '입금내역');
-  XLSX.writeFile(wb, '입금내역_양식.xlsx');
-}
-
 function showToast(msg){
   const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
@@ -2592,25 +2580,6 @@ function showToast(msg){
 <script src="patch.js"></script>
 <script>
 init();
-// ══════════════ 납품탭 신규 거래처 빠른 등록 ══════════════
-function openNewStoreQuick(){
-  // 신규 거래처 모달 열기 (기존 모달 재사용)
-  const modal = document.getElementById('new-store-modal');
-  if(!modal){ openNewStore(''); return; }
-  // 서브 텍스트 설정
-  const sub = document.getElementById('ns-sub');
-  if(sub) sub.textContent = '등록 후 오늘 루트에 즉시 추가됩니다';
-  // 입력 초기화
-  ['ns-name','ns-phone','ns-payer','ns-account','ns-note'].forEach(id=>{
-    const el = document.getElementById(id);
-    if(el) el.value = '';
-  });
-  const dayEl = document.getElementById('ns-day');
-  if(dayEl) dayEl.value = '';
-  modal.classList.add('show');
-  setTimeout(()=>document.getElementById('ns-name')?.focus(), 300);
-}
-
 </script>
 </body>
 </html>

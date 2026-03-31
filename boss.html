@@ -141,7 +141,11 @@ select option{background:#161b22;}
 <div class="page on" id="page-dashboard">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 4px">
     <div class="page-title">📊 사장님 현황</div>
+  <div style="display:flex;align-items:center;gap:6px;">
     <div style="font-size:10px;color:var(--t3);text-align:right" id="last-update">-</div>
+    <button onclick="changeBossPassword()" style="font-size:10px;padding:4px 9px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--t2);cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🔑 비번</button>
+    <button onclick="bossLogout()" style="font-size:10px;padding:4px 9px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--t2);cursor:pointer;font-family:'Noto Sans KR',sans-serif;">🚪 로그아웃</button>
+  </div>
   </div>
   <div class="month-row">
     <input type="month" id="dash-month" onchange="loadDashboard()">
@@ -248,25 +252,39 @@ select option{background:#161b22;}
     <button onclick="openStoreAdd()" style="padding:9px 14px;background:var(--y2);border:none;border-radius:10px;color:#000;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">+ 추가</button>
   </div>
 
-  <!-- 자동배정 박스 -->
-  <div class="assign-box">
-    <div class="assign-title">🤖 담당자 자동배정</div>
-    <div class="assign-desc">거래처별 전체 납품 횟수를 기준으로 담당자를 자동 배정합니다.<br>동률이면 "공유"로 표시됩니다.</div>
-    <div class="assign-stats" id="assign-stats">
-      <div class="assign-stat">
-        <div class="assign-stat-val" style="color:var(--y)" id="as-son">-</div>
-        <div class="assign-stat-label">손호영</div>
-      </div>
-      <div class="assign-stat">
-        <div class="assign-stat-val" style="color:var(--b)" id="as-bak">-</div>
-        <div class="assign-stat-label">박기빈</div>
-      </div>
-      <div class="assign-stat">
-        <div class="assign-stat-val" style="color:var(--t3)" id="as-none">-</div>
-        <div class="assign-stat-label">미배정</div>
-      </div>
+    <!-- 배차 섹션 -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div style="font-size:13px;font-weight:700;color:var(--y);">🚗 오늘 배차</div>
+      <div style="font-size:11px;color:var(--t2);" id="dispatch-date"></div>
     </div>
-    <button class="btn-assign" id="btn-assign" onclick="runAutoAssign()">🔄 자동배정 실행 (전체 기간 기준)</button>
+
+    <!-- 배차 입력 -->
+    <div id="dispatch-form" style="margin-bottom:10px;">
+      <div style="display:flex;gap:6px;margin-bottom:6px;">
+        <!-- 거래처 검색 -->
+        <div style="flex:1;position:relative;">
+          <input type="text" id="dispatch-store-q" placeholder="거래처 검색..."
+            style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+            oninput="onDispatchSearch()" onfocus="onDispatchSearch()"
+            onblur="setTimeout(()=>document.getElementById('dispatch-dd').style.display='none',150)"
+            autocomplete="off">
+          <div id="dispatch-dd" style="position:absolute;top:100%;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:9px;z-index:100;max-height:160px;overflow-y:auto;display:none;margin-top:2px;"></div>
+        </div>
+        <!-- 직원 선택 -->
+        <select id="dispatch-emp" style="background:var(--card2);border:1.5px solid var(--border);border-radius:9px;padding:9px 10px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;min-width:90px;">
+          <option value="손호영">손호영</option>
+          <option value="박기빈">박기빈</option>
+        </select>
+      </div>
+      <button onclick="addDispatch()"
+        style="width:100%;padding:10px;background:var(--p2);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+        + 배차 추가
+      </button>
+    </div>
+
+    <!-- 오늘 배차 목록 -->
+    <div id="dispatch-list"></div>
   </div>
 
   <!-- 검색 -->
@@ -1573,6 +1591,126 @@ function showAddEmpForm(){
     showBossLogin();
   }
 })();
+
+
+// ══════════════ 배차 시스템 ══════════════
+let dispatchList = JSON.parse(localStorage.getItem('dispatch_today_v1') || '[]');
+
+function initDispatch(){
+  const t = new Date().toISOString().slice(0,10);
+  const el = document.getElementById('dispatch-date');
+  if(el) el.textContent = t;
+
+  // 날짜 바뀌면 초기화
+  const lastDate = localStorage.getItem('dispatch_date_v1') || '';
+  if(lastDate !== t){
+    dispatchList = [];
+    localStorage.setItem('dispatch_today_v1', '[]');
+    localStorage.setItem('dispatch_date_v1', t);
+  }
+  renderDispatchList();
+}
+
+function onDispatchSearch(){
+  const q = (document.getElementById('dispatch-store-q')?.value || '').trim();
+  const dd = document.getElementById('dispatch-dd');
+  if(!dd) return;
+  const list = q
+    ? allStores.filter(s => s.이름.includes(q) || (s.입금자||'').includes(q))
+    : allStores.filter(s => s.상태 !== '비활성').slice(0, 20);
+  dd.innerHTML = list.map(s => `
+    <div style="padding:9px 13px;cursor:pointer;border-bottom:1px solid var(--border);font-size:13px;"
+      onmousedown="selectDispatchStore('${s.이름.replace(/'/g,"\'")}')">
+      ${s.이름}
+      <span style="font-size:10px;color:var(--t2);margin-left:6px;">${s.담당||'공유'} · ${s.요일||''}</span>
+    </div>`).join('') || '<div style="padding:9px 13px;font-size:12px;color:var(--t2);">검색 결과 없음</div>';
+  dd.style.display = 'block';
+}
+
+function selectDispatchStore(name){
+  const el = document.getElementById('dispatch-store-q');
+  if(el) el.value = name;
+  const dd = document.getElementById('dispatch-dd');
+  if(dd) dd.style.display = 'none';
+}
+
+async function addDispatch(){
+  const storeName = document.getElementById('dispatch-store-q')?.value?.trim();
+  const empName = document.getElementById('dispatch-emp')?.value;
+  if(!storeName){ showToast('거래처를 선택해주세요'); return; }
+  if(!empName){ showToast('직원을 선택해주세요'); return; }
+
+  const t = new Date().toISOString().slice(0,10);
+
+  // 중복 체크
+  if(dispatchList.find(d => d.거래처 === storeName && d.직원 === empName)){
+    showToast('이미 배차됐어요'); return;
+  }
+
+  const dispatch = {
+    거래처: storeName,
+    직원: empName,
+    날짜: t,
+    시간: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}),
+    완료: false
+  };
+
+  dispatchList.push(dispatch);
+  localStorage.setItem('dispatch_today_v1', JSON.stringify(dispatchList));
+
+  // GAS에 배차 정보 저장 (직원앱이 싱크로 받아감)
+  const s = allStores.find(x => x.이름 === storeName);
+  if(s){
+    s.배정상태 = '긴급배정';
+    s.배정직원 = empName;
+    s.배정날짜 = t;
+    try{
+      await fetch(API, {
+        method: 'POST',
+        headers: {'Content-Type': 'text/plain'},
+        body: JSON.stringify({
+          type: 'store_update',
+          store: {이름: storeName, 배정상태: '긴급배정', 배정직원: empName, 배정날짜: t}
+        })
+      });
+    }catch(e){}
+  }
+
+  document.getElementById('dispatch-store-q').value = '';
+  renderDispatchList();
+  showToast(`✅ ${storeName} → ${empName} 배차 완료`);
+}
+
+function removeDispatch(idx){
+  dispatchList.splice(idx, 1);
+  localStorage.setItem('dispatch_today_v1', JSON.stringify(dispatchList));
+  renderDispatchList();
+}
+
+function renderDispatchList(){
+  const el = document.getElementById('dispatch-list');
+  if(!el) return;
+  if(!dispatchList.length){
+    el.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:8px 0;text-align:center;">오늘 배차 없음</div>';
+    return;
+  }
+  el.innerHTML = dispatchList.map((d, i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--card2);border-radius:9px;margin-bottom:5px;">
+      <div>
+        <div style="font-size:13px;font-weight:700;">${d.거래처}
+          <span style="font-size:9px;padding:2px 6px;border-radius:10px;margin-left:4px;background:rgba(61,220,132,.12);color:var(--g);">${d.직원}</span>
+        </div>
+        <div style="font-size:10px;color:var(--t2);margin-top:2px;">${d.시간} 배차</div>
+      </div>
+      <button onclick="removeDispatch(${i})"
+        style="padding:4px 9px;background:rgba(255,107,107,.1);border:none;border-radius:6px;color:var(--r);font-size:11px;cursor:pointer;">
+        취소
+      </button>
+    </div>`).join('');
+}
+
+// 페이지 로드 시 배차 초기화
+document.addEventListener('DOMContentLoaded', () => setTimeout(initDispatch, 500));
 
 </script>
 </body>

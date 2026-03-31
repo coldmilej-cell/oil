@@ -72,8 +72,6 @@ function getLastVisit(storeName){
 
 // ══════════════ renderRoute 오버라이드 (프로그레스바 + 방문일) ══════════════
 
-// renderRoute 오버라이드 — 프로그레스바 + 방문일 + 긴급배정 뱃지
-const _origRenderRoute = null; // son.html 원본을 완전히 대체
 function renderRoute(){
   const list = getRouteList();
   const el = document.getElementById('route-list');
@@ -113,15 +111,13 @@ function renderRoute(){
     </div>`;
   }).join('');
 
-  // 긴급배정 / 신규배정 뱃지
+  // ── 긴급배정 / 신규배정 / 배차 뱃지 ──
   if(typeof stores !== 'undefined'){
-    const t_urgent = today ? today() : new Date().toISOString().slice(0,10);
-    const empName = typeof EMP !== 'undefined' ? EMP : '';
+    const t_badge = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
     stores.forEach(s => {
       if(s.배정상태 !== '긴급배정' && s.배정상태 !== '신규배정') return;
-      if(s.배정상태 === '긴급배정' && s.배정날짜 !== t_urgent) return;
-      const allItems = document.querySelectorAll('.route-item');
-      allItems.forEach(item => {
+      if(s.배정상태 === '긴급배정' && s.배정날짜 !== t_badge) return;
+      document.querySelectorAll('.route-item').forEach(item => {
         const nameEl = item.querySelector('.route-name');
         if(!nameEl || !nameEl.textContent.includes(s.이름)) return;
         if(item.querySelector('.urgent-badge')) return;
@@ -782,7 +778,6 @@ document.addEventListener('input', function(e){
 
 // ══════════════ 2단계: 거래처 카드 인라인 폼 ══════════════
 
-// openDelivery 완전 대체 (son.html 원본 호출 안 함)
 const _origOpenDelivery = typeof openDelivery === 'function' ? openDelivery : null;
 
 function openDelivery(name){
@@ -1001,8 +996,10 @@ function updateInlinePayBtns(idx){
 
   const charge = oilTotal - wastePay;
   const onlyWaste = wasteOn && oilTotal === 0 && !hasFeOrNeg;
-  const weReceive = charge > 0 || hasFeOrNeg; // 우리가 돈 받는 상황
-  const wePay = charge < 0 || onlyWaste;      // 우리가 돈 주는 상황
+  // 수수료/음수출고가: 청구액=0이므로 우리가 수익을 '받는' 구조
+  // 하지만 거래처에 청구하는 돈이 없으므로 → 현금지급/이체지급으로 정산
+  const weReceive = charge > 0;               // 실제 청구액이 양수일 때만
+  const wePay = charge < 0 || onlyWaste || (hasFeOrNeg && oilTotal === 0); // 청구없음 or 폐유만 or 수수료만
 
   // 버튼 정의: [id, 활성조건]
   const btnRules = {
@@ -1467,7 +1464,6 @@ document.addEventListener('input', function(e){
 // ══════════════ 2단계: 거래처 카드 인라인 폼 ══════════════
 // openDelivery 오버라이드 - 전체화면 대신 카드 아래 인라인 펼침
 
-// openDelivery 완전 대체 (son.html 원본 호출 안 함)
 const _origOpenDelivery = typeof openDelivery === 'function' ? openDelivery : null;
 
 function openDelivery(name){
@@ -2109,6 +2105,7 @@ function checkUrgentAssignments(){
   }
 }
 
+const _origRenderRoute = null; // son.html 원본 완전 대체
 // renderRoute 오버라이드 — 긴급배정 뱃지 추가
 
 // ── saveNewStore 오버라이드 — 배정상태 신규배정으로 ──
@@ -2480,4 +2477,68 @@ function renderCheckinDaySummary(logs){
         <div style="font-size:12px;font-weight:700;color:var(--p);line-height:1.4;">${stockText}</div>
       </div>
     </div>`;
+}
+
+// ══════════════ getRouteList 오버라이드 ══════════════
+// 미배정 = 공유 (둘 다 루트에 표시)
+// 대리 납품 가능 (타 직원 담당 거래처도 표시, 건너뜀 가능)
+
+const _origGetRouteList = typeof getRouteList === 'function' ? getRouteList : null;
+
+function getRouteList(){
+  const savedCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
+  const t = today();
+  const dayStr = DAYS[new Date().getDay()];
+  const skipped = JSON.parse(localStorage.getItem(`skip_${EMP}_${t}`) || '[]');
+
+  // 배차된 거래처 (사장이 오늘 배차한 것)
+  const dispatched = stores.filter(s =>
+    s.배정상태 === '긴급배정' &&
+    s.배정날짜 === t &&
+    (s.배정직원 === EMP || s.담당 === EMP) &&
+    s.상태 !== '비활성'
+  ).map(s => s.이름);
+
+  // 내 담당 거래처 (요일 필터)
+  const myStores = stores.filter(s =>
+    s.상태 !== '비활성' &&
+    s.담당 === EMP &&
+    (!s.요일 || s.요일 === dayStr)
+  ).map(s => s.이름);
+
+  // 미배정(공유) 거래처 — 요일 맞는 것
+  const sharedStores = stores.filter(s =>
+    s.상태 !== '비활성' &&
+    (!s.담당 || s.담당 === '' || s.담당 === '공유') &&
+    (!s.요일 || s.요일 === dayStr)
+  ).map(s => s.이름);
+
+  // 타 직원 담당이지만 오늘 요일인 거래처 (대리 납품용)
+  // → 루트에 표시되지만 "타담당" 배지 붙음
+  const otherStores = stores.filter(s =>
+    s.상태 !== '비활성' &&
+    s.담당 && s.담당 !== EMP && s.담당 !== '공유' &&
+    s.요일 === dayStr
+  ).map(s => s.이름);
+
+  // 상차한 거래처 (항상 포함)
+  const cargoStores = savedCargos.filter(c => c.거래처).map(c => c.거래처);
+
+  // 합치기 (중복 제거, 순서: 배차 > 내담당 > 공유 > 상차 > 타담당)
+  const allNames = [...new Set([
+    ...dispatched,
+    ...cargoStores,
+    ...myStores,
+    ...sharedStores,
+    ...otherStores,
+  ])].filter(n => !skipped.includes(n));
+
+  // routeOrder 적용
+  const ordered = [];
+  if(typeof routeOrder !== 'undefined'){
+    routeOrder.forEach(n => { if(allNames.includes(n)) ordered.push(n); });
+  }
+  allNames.forEach(n => { if(!ordered.includes(n)) ordered.push(n); });
+
+  return ordered;
 }

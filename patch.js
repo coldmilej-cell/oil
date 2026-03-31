@@ -237,8 +237,20 @@ function renderPriceTab(){
   const el=document.getElementById('price-list');if(!el)return;
   const latest={};priceHistory.forEach(p=>{if(!latest[p.품명]||new Date(p.날짜)>=new Date(latest[p.품명].날짜))latest[p.품명]=p;});
   let items=Object.values(latest);if(q)items=items.filter(p=>p.품명.toLowerCase().includes(q));items.sort((a,b)=>a.품명.localeCompare(b.품명,'ko'));
+  // 이전 단가 맵
+  const prevPrice={};
+  priceHistory.forEach(p=>{
+    if(latest[p.품명] && p.날짜 < latest[p.품명].날짜){
+      if(!prevPrice[p.품명] || new Date(p.날짜) > new Date(prevPrice[p.품명].날짜))
+        prevPrice[p.품명] = p;
+    }
+  });
   if(!items.length){el.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3)">단가 정보 없음</div>';return;}
-  el.innerHTML=items.map(p=>{const isFee=p.구분==='수수료',tagColor=isFee?'var(--r)':'var(--p)',tagBg=isFee?'rgba(255,107,107,.1)':'rgba(108,143,255,.1)';return `<div style="background:var(--card);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:700">${p.품명}${p.구분?`<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;background:${tagBg};color:${tagColor};margin-left:4px">${p.구분}</span>`:''}</div><div style="font-size:10px;color:var(--t3);margin-top:2px">${p.날짜} 기준</div></div><div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--y)">${(+p.출고가).toLocaleString()}원</div></div>`;}).join('');
+  el.innerHTML=items.map(p=>{const isFee=p.구분==='수수료',tagColor=isFee?'var(--r)':'var(--p)',tagBg=isFee?'rgba(255,107,107,.1)':'rgba(108,143,255,.1)';
+    const _prev=prevPrice[p.품명];
+    const _diff=_prev?(+p.출고가||0)-(+_prev.출고가||0):0;
+    const _diffTag=_diff!==0?`<span style="font-size:10px;color:${_diff>0?'var(--r)':'var(--g)'};margin-left:5px;font-weight:700;">${_diff>0?'▲':'▼'}${Math.abs(_diff).toLocaleString()}</span>`:'';
+    return `<div style="background:var(--card);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:7px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-size:13px;font-weight:700">${p.품명}${p.구분?`<span style="font-size:9px;font-weight:700;padding:2px 6px;border-radius:5px;background:${tagBg};color:${tagColor};margin-left:4px">${p.구분}</span>`:''}</div><div style="font-size:10px;color:var(--t3);margin-top:2px">${p.날짜} 기준</div></div><div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--y)">${(+p.출고가).toLocaleString()}원</div></div>`;}).join('');
 }
 
 function buildReceipt(tx){
@@ -494,6 +506,9 @@ function renderRoute(){
     if(prog) prog.innerHTML = '';
     return;
   }
+  const _routeLen = list.length;
+  const _barEl = document.getElementById('daily-bar');
+  if(_barEl) _barEl.style.display = _routeLen > 0 ? 'block' : 'none';
   updateDailyBar();
   const savedCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
   const doneCount = completedRoutes.filter(n => list.includes(n)).length;
@@ -503,6 +518,10 @@ function renderRoute(){
     const s = stores.find(x => x.이름 === name);
     const cargo = savedCargos.find(c => c.거래처 === name);
     const isMine = !s?.담당 || s?.담당 === EMP;
+    const misuAmt = (typeof misuMap !== 'undefined' ? misuMap[name] : 0) || 0;
+    const misuBadge = misuAmt > 0
+      ? `<span style="font-size:9px;background:rgba(255,107,107,.12);color:var(--r);border-radius:4px;padding:1px 6px;margin-left:4px;font-weight:700;">미수 ${misuAmt>=10000?Math.round(misuAmt/10000)+'만':misuAmt.toLocaleString()}원</span>`
+      : '';
     const meta = cargo ? `📦 ${cargo.유종} ${cargo.통수}통 상차` : (s?.유종 || '유종미등록');
     const crossLabel = !isMine && s?.담당 ? `<span style="font-size:9px;color:var(--o);margin-left:4px">↔ ${s.담당}</span>` : '';
     const visit = getLastVisit(name);
@@ -516,7 +535,7 @@ function renderRoute(){
         <div class="route-meta" style="color:${cargo ? 'var(--o)' : 'var(--t2)'}">${meta}</div>
       </div>
       ${done
-        ? `<button onclick="deleteTxByStore('${name}')" style="padding:6px 10px;background:rgba(255,107,107,.12);border:none;border-radius:8px;color:var(--r);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">납품삭제</button>`
+        ? `<button onclick="confirmDeleteTx('${name.replace(/'/g,\"\\'\")}')" style="padding:4px 8px;background:transparent;border:1px solid rgba(255,107,107,.3);border-radius:6px;color:rgba(255,107,107,.6);font-size:10px;cursor:pointer;flex-shrink:0">삭제</button>`
         : `<button onclick="removeFromRoute('${name}')" style="padding:6px 10px;background:rgba(122,127,148,.12);border:none;border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">✕</button>`
       }
       <div class="drag-handle" draggable="true"
@@ -929,7 +948,15 @@ function selectInlineType(itemIdx, formIdx, type){
   const isFee = isFeeItem(type, t);
   const isNeg = costPrice < 0;
   const priceEl = document.getElementById(`iprice-${itemIdx}-${formIdx}`);
-  if(priceEl && !isFee && !isNeg && costPrice > 0) priceEl.value = costPrice;
+  if(priceEl && !isFee && !isNeg && costPrice > 0){
+    priceEl.value = costPrice;
+    priceEl.style.color = 'var(--t3)'; // 자동입력 = 회색
+    priceEl.dataset.auto = 'true';
+    priceEl.oninput = function(){ 
+      this.style.color = 'var(--p)'; // 수정 = 파란색
+      this.dataset.auto = 'false';
+    };
+  }
   // 수수료/음수면 단가 행 숨기기
   const itemCard = document.getElementById(`inline-item-${itemIdx}-${formIdx}`);
   if(itemCard){
@@ -1205,6 +1232,9 @@ async function saveInlineDelivery(name, idx){
 
   if(!completedRoutes.includes(name)) completedRoutes.push(name);
   localStorage.setItem(`done_${EMP}_${t}`, JSON.stringify(completedRoutes));
+  // 완료 애니메이션
+  const _aidx = (typeof getRouteList==='function') ? getRouteList().indexOf(name) : -1;
+  if(_aidx >= 0) setTimeout(()=>{ if(typeof playDoneAnimation==='function') playDoneAnimation(_aidx); }, 80);
 
   // 신규등록 배차 완료 시 → 정식 거래처로 업데이트
   const _dispStore = (typeof stores !== 'undefined') ? stores.find(s=>s.이름===name) : null;
@@ -1499,5 +1529,30 @@ function renderTodayDispatch(){
         ${s.유종?`<span style="font-size:10px;color:var(--t3);margin-left:6px;">${s.유종}</span>`:''}
       </div>`;
     }).join('');
+  }
+}
+
+function confirmDeleteTx(name){
+  if(!confirm(`${name} 납품을 삭제할까요?`)) return;
+  if(!confirm('정말 삭제하시겠어요? 되돌릴 수 없어요.')) return;
+  deleteTxByStore(name);
+}
+
+// ══ 납품 완료 애니메이션 ══
+function playDoneAnimation(idx){
+  const card = document.getElementById('ri-' + idx);
+  if(!card) return;
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:absolute;inset:0;border-radius:12px;background:rgba(61,220,132,.15);display:flex;align-items:center;justify-content:center;z-index:10;pointer-events:none;';
+  overlay.innerHTML = '<div style="font-size:32px;animation:donePop .4s ease;">✅</div>';
+  card.style.position = 'relative';
+  card.appendChild(overlay);
+  setTimeout(()=>overlay.remove(), 700);
+  // CSS
+  if(!document.getElementById('done-anim-css')){
+    const s=document.createElement('style');
+    s.id='done-anim-css';
+    s.textContent='@keyframes donePop{0%{transform:scale(.3)}60%{transform:scale(1.3)}100%{transform:scale(1)}}';
+    document.head.appendChild(s);
   }
 }

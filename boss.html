@@ -148,6 +148,7 @@ select option{background:#161b22;}
 <div class="tabs">
   <div class="tab on"  onclick="goTab('dashboard')">📊 현황</div>
   <div class="tab"     onclick="goTab('history')">📋 내역</div>
+  <div class="tab"     onclick="goTab('dispatch')">🚗 배차</div>
   <div class="tab"     onclick="goTab('stores')">🏪 거래처</div>
   <div class="tab"     onclick="goTab('prices')">💰 단가</div>
 </div>
@@ -164,6 +165,7 @@ select option{background:#161b22;}
   </div>
   <div class="month-row">
     <input type="month" id="dash-month" onchange="loadDashboard()">
+    <span id="dash-closed-badge" style="display:none;font-size:10px;color:var(--r);background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);border-radius:6px;padding:3px 8px;font-weight:700;">🔒 마감됨</span>
     <button class="btn-refresh" onclick="loadAll()">📡 새로고침</button>
   </div>
   <div class="kpi-grid">
@@ -259,16 +261,150 @@ select option{background:#161b22;}
 
 <!-- ★ 수정 2: 내역탭 - 서브탭 제거, boss_patch.js가 채움 -->
 <div class="page" id="page-history">
-  <!-- boss_patch.js injectHistoryUI()가 이 영역을 채웁니다 -->
-  <input type="hidden" id="hist-month">
+  <!-- 헤더 -->
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 8px;">
+    <div class="page-title">📋 내역</div>
+    <button onclick="loadHistoryAll()" style="font-size:11px;padding:5px 10px;background:transparent;border:1px solid var(--border);border-radius:7px;color:var(--t2);cursor:pointer;font-family:'Noto Sans KR',sans-serif;">새로고침</button>
+  </div>
+
+  <!-- 월 선택 + 직원 필터 -->
+  <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+    <input type="month" id="hist-month"
+      style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+      onchange="loadHistoryAll()">
+    <select id="hist-emp" onchange="renderHistoryByTab()"
+      style="background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;">
+      <option value="">전체</option>
+      <option value="손호영">손호영</option>
+      <option value="박기빈">박기빈</option>
+    </select>
+  </div>
+
+  <!-- 마감 상태 표시 -->
+  <div id="hist-closed-badge" style="display:none;background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);border-radius:8px;padding:7px 12px;margin-bottom:10px;font-size:11px;color:var(--r);font-weight:700;">
+    🔒 마감된 월 — 수정 불가
+  </div>
+
+  <!-- 서브탭 -->
+  <div style="display:flex;gap:6px;margin-bottom:12px;">
+    <button id="stab-tx" onclick="setSubTab('tx')"
+      style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--p);background:rgba(108,143,255,.1);color:var(--p);font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+      📦 납품
+    </button>
+    <button id="stab-payment" onclick="setSubTab('payment')"
+      style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+      💳 입금
+    </button>
+    <button id="stab-waste" onclick="setSubTab('waste')"
+      style="flex:1;padding:9px;border-radius:9px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+      ♻️ 폐유
+    </button>
+  </div>
+
+  <!-- 요약 바 -->
+  <div id="hist-summary" style="background:var(--card2);border-radius:10px;padding:10px 12px;margin-bottom:10px;display:none;"></div>
+
+  <!-- 목록 -->
+  <div id="history-list"></div>
 </div>
 
 <!-- 거래처 -->
-<div class="page" id="page-stores">
-  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 4px">
-    <div class="page-title">🏪 거래처 관리</div>
-    <button onclick="openStoreAdd()" style="padding:9px 14px;background:var(--y2);border:none;border-radius:10px;color:#000;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">+ 추가</button>
+<!-- 배차 -->
+<div class="page" id="page-dispatch">
+  <div class="page-hdr">
+    <div class="page-title">🚗 배차 관리</div>
+    <div style="font-size:11px;color:var(--t2);" id="dispatch-date"></div>
   </div>
+
+  <!-- 날짜 + 타입 선택 -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;">
+    <div>
+      <div style="font-size:10px;color:var(--t2);margin-bottom:4px;">배차 날짜</div>
+      <div style="display:flex;gap:4px;">
+        <button id="ddate-today" onclick="setDispatchDate('today')"
+          style="flex:1;padding:8px 4px;border-radius:7px;border:1.5px solid var(--p);background:rgba(108,143,255,.1);color:var(--p);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">오늘</button>
+        <button id="ddate-tomorrow" onclick="setDispatchDate('tomorrow')"
+          style="flex:1;padding:8px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">내일</button>
+        <button id="ddate-custom" onclick="setDispatchDate('custom')"
+          style="flex:1;padding:8px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">직접</button>
+      </div>
+      <input type="date" id="ddate-input" style="display:none;width:100%;margin-top:4px;background:var(--bg);border:1.5px solid var(--p);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;" onchange="onDispatchDateInput()">
+      <div id="ddate-display" style="font-size:10px;color:var(--p);margin-top:3px;font-weight:600;"></div>
+    </div>
+    <div>
+      <div style="font-size:10px;color:var(--t2);margin-bottom:4px;">배차 타입</div>
+      <div style="display:flex;gap:4px;">
+        <button id="dtype-once" onclick="setDispatchType('일회성')"
+          style="flex:1;padding:8px 4px;border-radius:7px;border:1.5px solid var(--y);background:rgba(240,165,0,.1);color:var(--y);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">1회</button>
+        <button id="dtype-new" onclick="setDispatchType('신규등록')"
+          style="flex:1;padding:8px 4px;border-radius:7px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:11px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">신규</button>
+      </div>
+      <div id="dtype-display" style="font-size:10px;color:var(--y);margin-top:3px;font-weight:600;">일회성 납품</div>
+    </div>
+  </div>
+
+  <!-- 직원 선택 -->
+  <div style="display:flex;gap:6px;margin-bottom:8px;">
+    <div id="dbtn-손호영" onclick="selectDispatchEmp('손호영')"
+      style="flex:1;padding:11px;text-align:center;border-radius:10px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">
+      👤 손호영
+    </div>
+    <div id="dbtn-박기빈" onclick="selectDispatchEmp('박기빈')"
+      style="flex:1;padding:11px;text-align:center;border-radius:10px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">
+      👤 박기빈
+    </div>
+    <input type="hidden" id="dispatch-emp" value="">
+  </div>
+
+  <!-- 거래처 검색 -->
+  <div style="position:relative;margin-bottom:8px;">
+    <input type="text" id="dispatch-store-q" placeholder="거래처 검색 또는 신규 입력..."
+      style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+      oninput="onDispatchSearch()" onfocus="onDispatchSearch()"
+      onblur="setTimeout(()=>document.getElementById('dispatch-dd').style.display='none',150)"
+      autocomplete="off">
+    <div id="dispatch-dd" style="position:absolute;top:100%;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:10px;z-index:100;max-height:200px;overflow-y:auto;display:none;margin-top:2px;"></div>
+  </div>
+
+  <!-- 거래처 정보 패널 -->
+  <div id="dispatch-info-panel" style="display:none;background:var(--card2);border:1.5px solid var(--p);border-radius:10px;padding:12px;margin-bottom:10px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:11px;font-weight:700;color:var(--p);" id="dispatch-panel-label">거래처 정보</div>
+      <div id="dispatch-new-badge" style="display:none;font-size:10px;background:rgba(61,220,132,.15);color:var(--g);border:1px solid var(--g);border-radius:6px;padding:2px 7px;font-weight:700;">🆕 신규</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+      <div><div style="font-size:10px;color:var(--t2);margin-bottom:3px;">유종</div>
+        <input type="text" id="dispatch-유종" placeholder="예: 하이골드"
+          style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"></div>
+      <div><div style="font-size:10px;color:var(--t2);margin-bottom:3px;">방문요일</div>
+        <select id="dispatch-요일" style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;">
+          <option value="">없음</option><option>월</option><option>화</option><option>수</option><option>목</option><option>금</option>
+        </select></div>
+      <div><div style="font-size:10px;color:var(--t2);margin-bottom:3px;">연락처</div>
+        <input type="text" id="dispatch-연락처" placeholder="010-0000-0000"
+          style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"></div>
+      <div><div style="font-size:10px;color:var(--t2);margin-bottom:3px;">입금자명</div>
+        <input type="text" id="dispatch-입금자" placeholder="통장에 찍히는 이름"
+          style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"></div>
+    </div>
+  </div>
+
+  <button onclick="addDispatch()"
+    style="width:100%;padding:13px;background:var(--p2);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;margin-bottom:16px;">
+    + 배차 추가
+  </button>
+
+  <div style="font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.1em;margin-bottom:8px;">오늘 배차 현황</div>
+  <div id="dispatch-list"></div>
+</div>
+
+<div class="page" id="page-stores">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 10px;">
+    <div class="page-title">🏪 거래처 관리</div>
+    <button onclick="openStoreAdd()" style="padding:9px 16px;background:var(--p2);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">+ 추가</button>
+  </div>
+  <!-- 통계 바 -->
+  <div id="store-stats-bar" style="display:flex;gap:6px;margin-bottom:12px;"></div>
 
     <!-- 배차 섹션 -->
   <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;">
@@ -577,6 +713,17 @@ async function loadStores(){
 }
 
 async function loadDashboard(){
+  // 마감 여부 체크
+  const _dm = document.getElementById('dash-month')?.value;
+  if(_dm){
+    const [_dy,_dmm] = _dm.split('-');
+    fetch(`${API}?type=is_closed&year=${_dy}&month=${_dmm}`)
+      .then(r=>r.json())
+      .then(d=>{
+        const badge = document.getElementById('dash-closed-badge');
+        if(badge) badge.style.display = d.closed ? 'inline-block' : 'none';
+      }).catch(()=>{});
+  }
   const month=document.getElementById('dash-month').value;
   if(!month)return;
   const [y,m]=month.split('-');
@@ -596,18 +743,22 @@ let histPayments=[], histWaste=[];
 
 async function loadHistoryAll(){
   let month=document.getElementById('hist-month')?.value;
-  if(!month) month=document.getElementById('dash-month').value;
+  if(!month) month=document.getElementById('dash-month')?.value;
   if(!month) return;
   const [y,m]=month.split('-');
   try{
-    const [tr,pr,wr]=await Promise.all([
+    const [tr,pr,wr,cl]=await Promise.all([
       fetch(`${API}?type=tx&year=${y}&month=${m}`).then(r=>r.json()),
       fetch(`${API}?type=payments&year=${y}&month=${m}`).then(r=>r.json()),
       fetch(`${API}?type=waste_deliveries&year=${y}&month=${m}`).then(r=>r.json()),
+      fetch(`${API}?type=is_closed&year=${y}&month=${m}`).then(r=>r.json()),
     ]);
-    allTx=(tr.rows||[]).map(parseTx);
+    allTx=(tr.rows||tr.tx||[]).map(parseTx);
     histPayments=pr.rows||[];
     histWaste=wr.rows||[];
+    // 마감 배지
+    const badge = document.getElementById('hist-closed-badge');
+    if(badge) badge.style.display = cl.closed ? 'block' : 'none';
     renderHistoryByTab();
   }catch(e){showToast('⚠️ 불러오기 실패');}
 }
@@ -886,6 +1037,25 @@ function renderStores(){
   });
 
   document.getElementById('store-count').textContent=`총 ${list.length}개 거래처`;
+  // 통계바 업데이트
+  const _sb = document.getElementById('store-stats-bar');
+  if(_sb){
+    const _total = allStores.filter(s=>s.상태!=='비활성').length;
+    const _son = allStores.filter(s=>s.담당==='손호영'&&s.상태!=='비활성').length;
+    const _bak = allStores.filter(s=>s.담당==='박기빈'&&s.상태!=='비활성').length;
+    const _none = allStores.filter(s=>(!s.담당||s.담당==='')&&s.상태!=='비활성').length;
+    const _inact = allStores.filter(s=>s.상태==='비활성').length;
+    _sb.innerHTML=[
+      {label:'전체',val:_total,color:'var(--t2)',filter:'전체'},
+      {label:'손호영',val:_son,color:'#6c8fff',filter:'손호영'},
+      {label:'박기빈',val:_bak,color:'#3ddc84',filter:'박기빈'},
+      {label:'미배정',val:_none,color:'var(--y)',filter:'미배정'},
+      {label:'비활성',val:_inact,color:'var(--r)',filter:'비활성'},
+    ].map(s=>`<div onclick="setStoreFilter('${s.filter}')" style="flex:1;text-align:center;background:var(--card2);border-radius:8px;padding:7px 4px;cursor:pointer;">
+      <div style="font-size:16px;font-weight:900;color:${s.color};">${s.val}</div>
+      <div style="font-size:9px;color:var(--t3);margin-top:2px;">${s.label}</div>
+    </div>`).join('');
+  }
 
   const el=document.getElementById('store-list');
   if(!list.length){
@@ -922,8 +1092,12 @@ function renderStores(){
           ${cntBar}
           ${s.비고?`<div style="font-size:11px;color:var(--t3);margin-top:5px">📌 ${s.비고}</div>`:''}
         </div>
-        <div style="display:flex;gap:5px;margin-left:8px">
+        <div style="display:flex;gap:5px;margin-left:8px;flex-direction:column;">
           <button class="btn-edit" onclick="openStoreEdit('${s.코드}')">수정</button>
+          <button onclick="toggleStoreActive('${s.코드}','${s.상태==='비활성'?'활성':'비활성'}')"
+            style="padding:4px 8px;background:${s.상태==='비활성'?'rgba(61,220,132,.1)':'rgba(255,107,107,.1)'};border:1px solid ${s.상태==='비활성'?'var(--g)':'var(--r)'};border-radius:6px;color:${s.상태==='비활성'?'var(--g)':'var(--r)'};font-size:10px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;white-space:nowrap;">
+            ${s.상태==='비활성'?'활성화':'비활성'}
+          </button>
         </div>
       </div>
     </div>`;
@@ -1023,10 +1197,48 @@ function switchSubTab(tab){
   renderHistoryByTab();
 }
 
+function setSubTab(tab){
+  curSubTab = tab;
+  // 버튼 스타일
+  ['tx','payment','waste'].forEach(t => {
+    const btn = document.getElementById('stab-'+t);
+    if(!btn) return;
+    const on = t === tab;
+    btn.style.borderColor = on ? 'var(--p)' : 'var(--border)';
+    btn.style.background = on ? 'rgba(108,143,255,.1)' : 'var(--card2)';
+    btn.style.color = on ? 'var(--p)' : 'var(--t2)';
+  });
+  renderHistoryByTab();
+}
+
 function renderHistoryByTab(){
   if(curSubTab==='tx') renderHistory();
   else if(curSubTab==='waste') renderWasteHistory();
   else if(curSubTab==='payment') renderPaymentHistory();
+  // 요약 바 업데이트
+  updateHistSummary();
+}
+
+function updateHistSummary(){
+  const el = document.getElementById('hist-summary');
+  if(!el) return;
+  if(curSubTab === 'tx' && allTx.length > 0){
+    const emp = document.getElementById('hist-emp')?.value||'';
+    const list = emp ? allTx.filter(t=>t.직원===emp) : allTx;
+    const 총건 = list.length;
+    const 총매출 = list.reduce((s,t)=>s+(+t.식유금액||0),0);
+    const 총수익 = list.reduce((s,t)=>s+(+t.총수익||0),0);
+    const 미수 = list.filter(t=>t.미수==='TRUE'||t.미수===true).reduce((s,t)=>s+(+t.차감청구||0),0);
+    el.style.display='block';
+    el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;">
+      <div><div style="font-size:13px;font-weight:900;">${총건}</div><div style="font-size:9px;color:var(--t3);">납품건</div></div>
+      <div><div style="font-size:13px;font-weight:900;color:var(--p);">${Math.round(총매출/10000)}만</div><div style="font-size:9px;color:var(--t3);">매출</div></div>
+      <div><div style="font-size:13px;font-weight:900;color:var(--g);">${Math.round(총수익/10000)}만</div><div style="font-size:9px;color:var(--t3);">수익</div></div>
+      <div><div style="font-size:13px;font-weight:900;color:var(--r);">${Math.round(미수/10000)}만</div><div style="font-size:9px;color:var(--t3);">미수</div></div>
+    </div>`;
+  } else {
+    el.style.display='none';
+  }
 }
 
 function renderHistory(){
@@ -1216,7 +1428,7 @@ function toggleCustom(){
 }
 
 // ===== 탭 이동 =====
-const TAB_IDS=['dashboard','history','stores','prices'];
+const TAB_IDS=['dashboard','history','dispatch','stores','prices'];
 function goTab(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',TAB_IDS[i]===t));
   document.querySelectorAll('.page').forEach((el,i)=>el.classList.toggle('on',`page-${TAB_IDS[i]}`===`page-${t}`));
@@ -1227,6 +1439,7 @@ function goTab(t){
     if(hm&&!hm.value) hm.value=dm;
     loadHistoryAll();
   }
+  if(t==='dispatch') initDispatch();
   if(t==='stores') loadStores();
   if(t==='prices') loadPrices();
 }
@@ -2229,6 +2442,31 @@ function renderMisuReport(){
         </div>`:''}
       </div>`;
     }).join('')}`;
+}
+
+// ══ 거래처 비활성/활성화 ══
+async function toggleStoreActive(코드, 상태){
+  const s = allStores.find(x=>x.코드===코드);
+  if(!s) return;
+  const msg = 상태==='비활성'
+    ? `"${s.이름}" 비활성 처리할까요?
+납품/검색에서 제외됩니다.`
+    : `"${s.이름}" 다시 활성화할까요?`;
+  if(!confirm(msg)) return;
+  s.상태 = 상태;
+  try{
+    await fetch(API, {
+      method:'POST', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({
+        type: 상태==='비활성' ? 'store_deactivate' : 'store_activate',
+        코드, 이름: s.이름
+      })
+    });
+    showToast(상태==='비활성' ? `✅ ${s.이름} 비활성 처리됨` : `✅ ${s.이름} 활성화됨`);
+  }catch(e){
+    showToast('⚠️ 서버 저장 실패 - 로컬에만 반영');
+  }
+  renderStores();
 }
 </script>
 

@@ -1526,6 +1526,8 @@ function onTypeSearch(id){
 
   dd.innerHTML=opts.map(type=>{
     const basePrice=getPriceAt(type,t)||0;
+    const isFeeType=isFeeItem(type,t);
+    const isNegType=basePrice<0;
     let recentPrice=0;
     if(storeName){
       const recentTx=txList.filter(x=>x.거래처===storeName&&x.유종&&x.유종.includes(type))
@@ -1541,11 +1543,13 @@ function onTypeSearch(id){
     }
     const showPrice=recentPrice&&recentPrice!==basePrice;
     const isRec=recommended.has(type);
+    const feeTag=isFeeType?'<span style="font-size:9px;color:var(--o);background:rgba(255,159,67,.1);border-radius:4px;padding:1px 5px;margin-left:4px;">수수료</span>'
+      :isNegType?'<span style="font-size:9px;color:var(--g);background:rgba(61,220,132,.1);border-radius:4px;padding:1px 5px;margin-left:4px;">수입</span>':'';
     return `<div class="type-opt" onmousedown="selectType(${id},'${type}')">
       <div style="display:flex;justify-content:space-between;align-items:center">
-        <span>${type}${isRec?'<span style="color:var(--g);font-size:9px;margin-left:4px">★</span>':''}</span>
+        <span>${type}${isRec?'<span style="color:var(--g);font-size:9px;margin-left:4px">★</span>':''}${feeTag}</span>
         <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:${showPrice?'var(--y)':'var(--t3)'}">
-          ${showPrice?recentPrice.toLocaleString():basePrice?basePrice.toLocaleString():'-'}원
+          ${isFeeType||isNegType?'':''}${showPrice?recentPrice.toLocaleString():basePrice?basePrice.toLocaleString():'-'}원
           ${showPrice?'<span style="color:var(--t3);font-size:9px"> (최근)</span>':''}
         </span>
       </div>

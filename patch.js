@@ -1166,8 +1166,34 @@ function onInlineTypeSearch(itemIdx, formIdx){
   const q = (document.getElementById(`itype-${itemIdx}-${formIdx}`)?.value||'').trim().toLowerCase();
   const dd = document.getElementById(`itdd-${itemIdx}-${formIdx}`);
   if(!dd) return;
-  const opts = q ? getTypeOptions().filter(t=>t.toLowerCase().includes(q)) : getTypeOptions().slice(0,12);
-  dd.innerHTML = opts.map(t=>`<div class="type-opt" onmousedown="selectInlineType(${itemIdx},${formIdx},'${t}')">${t}</div>`).join('');
+  const t = today();
+  const allOpts = getTypeOptions();
+  // 거래처 추천 유종 우선
+  const storeName = (typeof curStore !== 'undefined' && curStore?.이름) || '';
+  const rec = new Set();
+  if(storeName){
+    const s = (typeof stores !== 'undefined' ? stores : []).find(x=>x.이름===storeName);
+    if(s?.유종) s.유종.split('/').filter(Boolean).forEach(v=>rec.add(v.trim()));
+  }
+  const opts = q ? allOpts.filter(o=>o.toLowerCase().includes(q)) : allOpts.slice(0,15);
+  dd.innerHTML = opts.map(o=>{
+    const cost = getPriceAt(o, t) || 0;
+    const isFee = isFeeItem(o, t);
+    const isNeg = cost < 0;
+    const isRec = rec.has(o);
+    const tag = isFee
+      ? `<span style="font-size:9px;color:var(--o);background:rgba(255,159,67,.1);border-radius:4px;padding:1px 5px;margin-left:4px;">수수료</span>`
+      : isNeg
+        ? `<span style="font-size:9px;color:var(--g);background:rgba(61,220,132,.1);border-radius:4px;padding:1px 5px;margin-left:4px;">수입</span>`
+        : '';
+    const priceTag = !isFee && !isNeg && cost > 0
+      ? `<span style="font-size:10px;color:var(--t3);margin-left:auto;font-family:'JetBrains Mono',monospace;">${cost.toLocaleString()}</span>`
+      : '';
+    const recDot = isRec ? `<span style="color:var(--g);font-size:9px;margin-left:3px;">★</span>` : '';
+    return `<div class="type-opt" style="display:flex;align-items:center;gap:2px;" onmousedown="selectInlineType(${itemIdx},${formIdx},'${o}')">
+      <span>${o}</span>${recDot}${tag}${priceTag}
+    </div>`;
+  }).join('') || `<div class="type-opt" style="color:var(--t3)">결과 없음</div>`;
   dd.classList.add('show');
 }
 
@@ -1178,6 +1204,14 @@ function hideInlineDd(itemIdx, formIdx){
 function selectInlineType(itemIdx, formIdx, type){
   const el = document.getElementById(`itype-${itemIdx}-${formIdx}`);
   if(el) el.value = type;
+  // 중복 유종 경고
+  const existing = getInlineItems(formIdx).filter((item, i) => {
+    const otherEl = document.getElementById(`itype-${i === 0 ? 0 : i}-${formIdx}`);
+    return otherEl && otherEl.value === type && i !== itemIdx;
+  });
+  if(existing.length > 0) {
+    if(typeof showToast === 'function') showToast(`⚠️ ${type} 이미 입력됨 — 통수 합산 권장`);
+  }
   hideInlineDd(itemIdx, formIdx);
   const t = today();
   const costPrice = getPriceAt(type, t) || 0;

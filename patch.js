@@ -72,6 +72,8 @@ function getLastVisit(storeName){
 
 // ══════════════ renderRoute 오버라이드 (프로그레스바 + 방문일) ══════════════
 
+// renderRoute 오버라이드 — 프로그레스바 + 방문일 + 긴급배정 뱃지
+const _origRenderRoute = null; // son.html 원본을 완전히 대체
 function renderRoute(){
   const list = getRouteList();
   const el = document.getElementById('route-list');
@@ -110,6 +112,33 @@ function renderRoute(){
       <div class="drag-handle" draggable="true" ondragstart="dragStart(event,'${name}')" ondragover="dragOver(event)" ondrop="dragDrop(event,'${name}')" ondragend="dragEnd(event)">⠿</div>
     </div>`;
   }).join('');
+
+  // 긴급배정 / 신규배정 뱃지
+  if(typeof stores !== 'undefined'){
+    const t_urgent = today ? today() : new Date().toISOString().slice(0,10);
+    const empName = typeof EMP !== 'undefined' ? EMP : '';
+    stores.forEach(s => {
+      if(s.배정상태 !== '긴급배정' && s.배정상태 !== '신규배정') return;
+      if(s.배정상태 === '긴급배정' && s.배정날짜 !== t_urgent) return;
+      const allItems = document.querySelectorAll('.route-item');
+      allItems.forEach(item => {
+        const nameEl = item.querySelector('.route-name');
+        if(!nameEl || !nameEl.textContent.includes(s.이름)) return;
+        if(item.querySelector('.urgent-badge')) return;
+        const badge = document.createElement('span');
+        badge.className = 'urgent-badge';
+        badge.style.cssText = s.배정상태 === '긴급배정'
+          ? 'font-size:9px;font-weight:700;color:var(--r);background:rgba(255,107,107,.15);padding:2px 6px;border-radius:10px;margin-left:4px;'
+          : 'font-size:9px;font-weight:700;color:var(--o);background:rgba(255,159,67,.15);padding:2px 6px;border-radius:10px;margin-left:4px;';
+        badge.textContent = s.배정상태 === '긴급배정' ? '🚨 긴급' : '🆕 신규';
+        nameEl.appendChild(badge);
+        if(s.배정상태 === '긴급배정'){
+          item.style.borderColor = 'var(--r)';
+          item.style.borderWidth = '1.5px';
+        }
+      });
+    });
+  }
 }
 
 // ══════════════ saveDelivery 오버라이드 (완료 애니메이션 추가) ══════════════
@@ -552,50 +581,6 @@ function renderRouteProgress(done, total){
     </div>`;
 }
 
-const _origRenderRoute = typeof renderRoute === 'function' ? renderRoute : null;
-
-function renderRoute(){
-  const list = getRouteList();
-  const el = document.getElementById('route-list');
-  const prog = document.getElementById('route-progress');
-  if(!list.length){
-    el.innerHTML = '<div class="empty"><div class="empty-icon">📍</div><div>루트 없음<br><span style="font-size:10px">출근탭에서 상차를 입력하거나<br>거래처 요일을 등록해주세요</span></div></div>';
-    if(prog) prog.innerHTML = '';
-    return;
-  }
-  updateDailyBar();
-  const savedCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
-  const doneCount = completedRoutes.filter(n => list.includes(n)).length;
-  renderRouteProgress(doneCount, list.length);
-  el.innerHTML = list.map((name, i) => {
-    const done = completedRoutes.includes(name);
-    const s = stores.find(x => x.이름 === name);
-    const cargo = savedCargos.find(c => c.거래처 === name);
-    const isMine = !s?.담당 || s?.담당 === EMP;
-    const meta = cargo ? `📦 ${cargo.유종} ${cargo.통수}통 상차` : (s?.유종 || '유종미등록');
-    const crossLabel = !isMine && s?.담당 ? `<span style="font-size:9px;color:var(--o);margin-left:4px">↔ ${s.담당}</span>` : '';
-    const visit = getLastVisit(name);
-    const visitBadge = visit
-      ? `<span style="font-size:9px;font-weight:600;color:${visit.color};background:rgba(0,0,0,.2);padding:2px 6px;border-radius:10px;margin-left:4px">${visit.label}</span>`
-      : '';
-    return `<div class="route-item ${done ? 'done' : ''}" id="ri-${i}" data-name="${name}">
-      <div class="route-order" style="background:${done ? 'var(--g)' : 'var(--p2)'};flex-shrink:0">${done ? '✓' : i+1}</div>
-      <div class="route-info" onclick="openDelivery('${name}')">
-        <div class="route-name">${name}${crossLabel}${visitBadge}</div>
-        <div class="route-meta" style="color:${cargo ? 'var(--o)' : 'var(--t2)'}">${meta}</div>
-      </div>
-      ${done
-        ? `<button onclick="deleteTxByStore('${name}')" style="padding:6px 10px;background:rgba(255,107,107,.12);border:none;border-radius:8px;color:var(--r);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">납품삭제</button>`
-        : `<button onclick="removeFromRoute('${name}')" style="padding:6px 10px;background:rgba(122,127,148,.12);border:none;border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">✕</button>`
-      }
-      <div class="drag-handle" draggable="true"
-        ondragstart="dragStart(event,'${name}')"
-        ondragover="dragOver(event)"
-        ondrop="dragDrop(event,'${name}')"
-        ondragend="dragEnd(event)">⠿</div>
-    </div>`;
-  }).join('');
-}
 
 // ── saveDelivery 오버라이드 (완료 애니메이션) ──
 const _origSaveDelivery = typeof saveDelivery === 'function' ? saveDelivery : null;
@@ -797,6 +782,7 @@ document.addEventListener('input', function(e){
 
 // ══════════════ 2단계: 거래처 카드 인라인 폼 ══════════════
 
+// openDelivery 완전 대체 (son.html 원본 호출 안 함)
 const _origOpenDelivery = typeof openDelivery === 'function' ? openDelivery : null;
 
 function openDelivery(name){
@@ -1481,6 +1467,7 @@ document.addEventListener('input', function(e){
 // ══════════════ 2단계: 거래처 카드 인라인 폼 ══════════════
 // openDelivery 오버라이드 - 전체화면 대신 카드 아래 인라인 펼침
 
+// openDelivery 완전 대체 (son.html 원본 호출 안 함)
 const _origOpenDelivery = typeof openDelivery === 'function' ? openDelivery : null;
 
 function openDelivery(name){
@@ -2123,45 +2110,6 @@ function checkUrgentAssignments(){
 }
 
 // renderRoute 오버라이드 — 긴급배정 뱃지 추가
-const _origRenderRoute2 = typeof renderRoute === 'function' ? renderRoute : null;
-
-function renderRoute(){
-  // 기존 renderRoute 실행
-  if(_origRenderRoute2) _origRenderRoute2();
-
-  // 긴급배정 뱃지 추가
-  const t = today();
-  const empName = typeof EMP !== 'undefined' ? EMP : '';
-  if(typeof stores === 'undefined') return;
-
-  stores.forEach(s => {
-    if(s.배정상태 !== '긴급배정' && s.배정상태 !== '신규배정') return;
-    if(s.배정날짜 !== t && s.배정상태 !== '신규배정') return;
-
-    // 루트 아이템 찾기
-    const allItems = document.querySelectorAll('.route-item');
-    allItems.forEach(item => {
-      const nameEl = item.querySelector('.route-name');
-      if(!nameEl) return;
-      if(!nameEl.textContent.includes(s.이름)) return;
-      if(item.querySelector('.urgent-badge')) return; // 이미 있으면 스킵
-
-      const badge = document.createElement('span');
-      badge.className = 'urgent-badge';
-      badge.style.cssText = s.배정상태 === '긴급배정'
-        ? 'font-size:9px;font-weight:700;color:#ff5757;background:rgba(255,87,87,.15);padding:2px 6px;border-radius:10px;margin-left:4px;'
-        : 'font-size:9px;font-weight:700;color:#ff9f43;background:rgba(255,159,67,.15);padding:2px 6px;border-radius:10px;margin-left:4px;';
-      badge.textContent = s.배정상태 === '긴급배정' ? '🚨 긴급' : '🆕 신규';
-      nameEl.appendChild(badge);
-
-      // 긴급은 카드 테두리도 강조
-      if(s.배정상태 === '긴급배정'){
-        item.style.borderColor = 'var(--r)';
-        item.style.borderWidth = '1.5px';
-      }
-    });
-  });
-}
 
 // ── saveNewStore 오버라이드 — 배정상태 신규배정으로 ──
 const _origSaveNewStore = typeof saveNewStore === 'function' ? saveNewStore : null;

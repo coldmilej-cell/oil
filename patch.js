@@ -1,3 +1,9 @@
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// © 2025 제이제이컴퍼니 (JJ Company)
+// Oil Distribution Management System v3.0
+// All rights reserved. Unauthorized use prohibited.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 // patch.js v2 - son.html / bak.html 패치
 // son.html / bak.html 의 </body> 바로 앞에
 // <script src="patch.js"></script> 한 줄만 있으면 됩니다.
@@ -790,6 +796,689 @@ document.addEventListener('input', function(e){
 }, true);
 
 // ══════════════ 2단계: 거래처 카드 인라인 폼 ══════════════
+
+const _origOpenDelivery = typeof openDelivery === 'function' ? openDelivery : null;
+
+function openDelivery(name){
+  if(completedRoutes.includes(name)) return;
+  const list = getRouteList();
+  const idx = list.indexOf(name);
+  if(idx < 0) return;
+  const card = document.getElementById(`ri-${idx}`);
+  if(!card) return;
+
+  // 이미 열려있으면 닫기
+  if(card.querySelector('.inline-delivery-form')){
+    closeInlineForm(idx); return;
+  }
+  // 다른 폼 닫기
+  document.querySelectorAll('.inline-delivery-form').forEach(f => {
+    const c = f.closest('.route-item');
+    if(c) c.style.borderColor = '';
+    f.remove();
+  });
+
+  card.style.borderColor = 'var(--p)';
+
+  const s = stores.find(x => x.이름 === name);
+  const savedCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
+  const cargo = savedCargos.find(c => c.거래처 === name);
+  const t = today();
+  const wcp = getWastePriceAt(t);
+
+  // 미수 로컬 계산
+  const misuAmt = txList
+    .filter(x => x.거래처 === name)
+    .reduce((a, x) => {
+      if(x.미수 === true || x.미수 === 'TRUE') return a + (+x.차감청구||0);
+      if(x.수금방법 === '현금' || x.수금방법 === '이체') return a - (+x.수금액||0);
+      return a;
+    }, 0);
+
+  const defaultType = cargo?.유종 || s?.유종?.split('/')[0]?.trim() || '';
+  const defaultQty  = cargo?.통수 || 0;
+  const costPrice   = defaultType ? (getPriceAt(defaultType, t) || 0) : 0;
+  const isFee       = defaultType ? isFeeItem(defaultType, t) : false;
+  const isNegCost   = costPrice < 0;
+  const hidePrice   = isFee || isNegCost;
+  const defaultPrice = hidePrice ? 0 : costPrice;
+
+  const formHtml = `
+  <div class="inline-delivery-form" style="border-top:1px solid var(--border);padding:14px 13px;background:var(--card2);">
+
+    <!-- 거래처명 크게 -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div>
+        <div style="font-size:18px;font-weight:900;color:var(--t);">${name}</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:2px;">${s?.요일||''}요일 · ${s?.유종||''}</div>
+      </div>
+      <button onclick="closeInlineForm(${idx})" style="padding:6px 10px;background:rgba(255,107,107,.1);border:none;border-radius:7px;color:var(--r);font-size:11px;cursor:pointer;">✕</button>
+    </div>
+
+    <!-- 미수 표시 -->
+    ${misuAmt > 0 ? `
+    <div style="background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.2);border-radius:8px;padding:8px 12px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-size:12px;color:var(--t2);">현재 미수잔액</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:14px;font-weight:700;color:var(--r);">${misuAmt.toLocaleString()}원</span>
+    </div>` : ''}
+
+    <!-- 품목 -->
+    <div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--t3);margin-bottom:6px;">ITEMS</div>
+    <div id="inline-items-${idx}">
+      <div class="inline-item" id="inline-item-0-${idx}" style="background:var(--card);border:1px solid var(--border);border-radius:9px;padding:10px 11px;margin-bottom:6px;">
+        <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+          <div style="flex:1;position:relative;">
+            <input class="inp type-search-input" id="itype-0-${idx}" value="${defaultType}" placeholder="유종 검색..."
+              style="font-size:13px;padding:9px 11px;"
+              oninput="onInlineTypeSearch(0,${idx})" onfocus="onInlineTypeSearch(0,${idx})"
+              onblur="setTimeout(()=>hideInlineDd(0,${idx}),150)" autocomplete="off">
+            <div class="type-dropdown" id="itdd-0-${idx}"></div>
+          </div>
+          <input class="inp" id="iqty-0-${idx}" type="number" value="${defaultQty||''}" placeholder="통수"
+            inputmode="numeric" style="width:68px;font-size:14px;padding:9px 10px;font-family:'JetBrains Mono',monospace;"
+            oninput="numOnlyNeg(this);calcInline(${idx});updateInlinePayBtns(${idx})">
+        </div>
+        ${hidePrice ? `
+        <div style="font-size:11px;color:var(--o);background:rgba(255,159,67,.08);border:1px solid rgba(255,159,67,.2);padding:5px 10px;border-radius:6px;">
+          ${isNegCost ? `수수료 수입 ${Math.abs(costPrice).toLocaleString()}원/통` : '수수료 품목 — 차감청구 없음'}
+        </div>` : `
+        <div style="display:flex;align-items:center;gap:6px;">
+          <span style="font-size:10px;color:var(--t2);white-space:nowrap;">판매단가</span>
+          <input class="inp" id="iprice-0-${idx}" type="number" value="${defaultPrice||''}" placeholder="${defaultPrice}"
+            inputmode="numeric" style="flex:1;font-size:13px;padding:9px 10px;font-family:'JetBrains Mono',monospace;"
+            oninput="numOnly(this);calcInline(${idx});updateInlinePayBtns(${idx})">
+          <span style="font-size:10px;color:var(--t3);">원</span>
+        </div>
+        <div id="imargin-0-${idx}" style="font-size:10px;margin-top:3px;"></div>`}
+      </div>
+    </div>
+    <button onclick="addInlineItem(${idx})" style="width:100%;padding:8px;background:transparent;border:1px dashed var(--border);border-radius:8px;color:var(--t3);font-size:11px;cursor:pointer;margin-bottom:12px;">+ 품목 추가</button>
+
+    <!-- 폐유 수거 -->
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleInlineWaste(${idx})">
+        <span style="font-size:13px;color:var(--o);">♻️ 폐유 수거</span>
+        <div class="toggle-sw" id="inline-waste-sw-${idx}"></div>
+      </div>
+      <div id="inline-waste-fields-${idx}" style="display:none;margin-top:10px;">
+        <div style="display:flex;gap:5px;margin-bottom:8px;">
+          <div onclick="setInlineWasteMode(${idx},'calc')" id="iwm-calc-${idx}"
+            style="flex:1;padding:7px;text-align:center;border-radius:7px;font-size:11px;cursor:pointer;border:1px solid var(--p);background:rgba(108,143,255,.1);color:var(--p);">kg × 단가</div>
+          <div onclick="setInlineWasteMode(${idx},'direct')" id="iwm-direct-${idx}"
+            style="flex:1;padding:7px;text-align:center;border-radius:7px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:transparent;color:var(--t3);">직접입력</div>
+        </div>
+        <div id="iwaste-calc-${idx}">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <label style="font-size:10px;color:var(--t2);">실중량(kg)</label>
+              <input class="inp" id="iwkg-${idx}" type="number" placeholder="0.0" step="0.1" inputmode="decimal"
+                style="font-size:13px;padding:9px 10px;" oninput="numOnly(this,true);calcInline(${idx});updateInlinePayBtns(${idx})">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              <label style="font-size:10px;color:var(--t2);">매입단가</label>
+              <input class="inp" id="iwprice-${idx}" type="number" value="${wcp}" inputmode="numeric"
+                style="font-size:13px;padding:9px 10px;font-family:'JetBrains Mono',monospace;" oninput="numOnly(this);calcInline(${idx});updateInlinePayBtns(${idx})">
+            </div>
+          </div>
+        </div>
+        <div id="iwaste-direct-${idx}" style="display:none;">
+          <div style="display:flex;flex-direction:column;gap:3px;">
+            <label style="font-size:10px;color:var(--t2);">폐유 지급액(원)</label>
+            <input class="inp" id="iwdirect-${idx}" type="number" placeholder="0" inputmode="numeric"
+              style="font-size:13px;padding:9px 10px;" oninput="numOnly(this);calcInline(${idx});updateInlinePayBtns(${idx})">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 미수 차감 토글 (미수 있을 때만) -->
+    ${misuAmt > 0 ? `
+    <div id="inline-misu-section-${idx}" style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer;" onclick="toggleInlineMisu(${idx})">
+        <span style="font-size:13px;color:var(--r);">미수 차감</span>
+        <div class="toggle-sw" id="inline-misu-sw-${idx}"></div>
+      </div>
+      <div id="inline-misu-fields-${idx}" style="display:none;margin-top:8px;">
+        <div style="display:flex;flex-direction:column;gap:3px;">
+          <label style="font-size:10px;color:var(--t2);">차감 금액 (0 = 전액 ${misuAmt.toLocaleString()}원)</label>
+          <input class="inp" id="imisuamt-${idx}" type="number" placeholder="0" inputmode="numeric"
+            style="font-size:13px;padding:9px 10px;" oninput="numOnly(this);calcInline(${idx});updateInlinePayBtns(${idx})">
+        </div>
+      </div>
+    </div>` : ''}
+
+    <!-- 수금 버튼 -->
+    <div style="border-top:1px solid var(--border);padding-top:10px;margin-bottom:10px;">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.1em;color:var(--t3);margin-bottom:8px;">수금</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;margin-bottom:8px;" id="inline-pay-btns-${idx}">
+        <div class="pay-btn" id="ipay-현금-${idx}" onclick="setInlinePay(${idx},'현금')" style="font-size:12px;padding:10px 4px;">현금</div>
+        <div class="pay-btn danger" id="ipay-미수-${idx}" onclick="setInlinePay(${idx},'미수')" style="font-size:12px;padding:10px 4px;">미수</div>
+        <div class="pay-btn" id="ipay-이체-${idx}" onclick="setInlinePay(${idx},'이체')" style="font-size:12px;padding:10px 4px;">이체</div>
+        <div class="pay-btn" id="ipay-현금지급-${idx}" onclick="setInlinePay(${idx},'현금지급')" style="font-size:12px;padding:10px 4px;">현금지급</div>
+        <div class="pay-btn" id="ipay-이체지급-${idx}" onclick="setInlinePay(${idx},'이체지급')" style="font-size:12px;padding:10px 4px;">이체지급</div>
+        <div class="pay-btn" id="ipay-반품-${idx}" onclick="setInlinePay(${idx},'반품')" style="font-size:12px;padding:10px 4px;">반품</div>
+      </div>
+      <div id="inline-payamt-wrap-${idx}" style="display:none;">
+        <input class="inp" id="ipayamt-${idx}" type="number" placeholder="수금액(원)" inputmode="numeric"
+          style="font-size:14px;padding:10px 12px;" oninput="numOnly(this)">
+      </div>
+    </div>
+
+    <!-- 결과 -->
+    <div id="inline-result-${idx}" style="background:var(--card);border:1px solid var(--border);border-radius:9px;padding:10px 12px;margin-bottom:10px;display:none;"></div>
+
+    <!-- 비고 -->
+    <div style="display:flex;flex-direction:column;gap:3px;margin-bottom:12px;">
+      <label style="font-size:10px;color:var(--t2);">비고</label>
+      <input class="inp" id="inote-${idx}" type="text" placeholder="특이사항" style="font-size:13px;padding:9px 12px;">
+    </div>
+
+    <button onclick="saveInlineDelivery('${name.replace(/'/g,"\'")}',${idx})"
+      style="width:100%;padding:14px;background:var(--p2);border:none;border-radius:10px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+      저장
+    </button>
+  </div>`;
+
+  card.insertAdjacentHTML('beforeend', formHtml);
+  updateInlinePayBtns(idx);
+  calcInline(idx);
+  setTimeout(() => card.scrollIntoView({behavior:'smooth', block:'nearest'}), 100);
+}
+
+// ── 수금 버튼 활성/비활성 로직 ──
+function updateInlinePayBtns(idx){
+  const t = today();
+  const items = getInlineItems(idx);
+  const wasteOn = inlineWasteOn[idx] || false;
+  const wasteMode = inlineWasteMode[idx] || 'calc';
+  const misuOn = inlineMisuOn[idx] || false;
+
+  // 청구 계산
+  let oilTotal = 0;
+  let hasReturn = false;
+  items.forEach(item => {
+    if(!item.isFee && item.costPrice >= 0) oilTotal += item.price * item.qty;
+    if(item.qty < 0) hasReturn = true;
+  });
+  const hasFeOrNeg = items.some(i => i.isFee || i.costPrice < 0);
+
+  let wastePay = 0;
+  if(wasteOn){
+    if(wasteMode === 'calc'){
+      const wkg = parseFloat(document.getElementById(`iwkg-${idx}`)?.value)||0;
+      const wp  = parseFloat(document.getElementById(`iwprice-${idx}`)?.value)||getWastePriceAt(t);
+      wastePay = Math.round(wkg * wp);
+    } else {
+      wastePay = parseFloat(document.getElementById(`iwdirect-${idx}`)?.value)||0;
+    }
+  }
+
+  const charge = oilTotal - wastePay;
+  const onlyWaste = wasteOn && oilTotal === 0 && !hasFeOrNeg;
+  const weReceive = charge > 0 || hasFeOrNeg; // 우리가 돈 받는 상황
+  const wePay = charge < 0 || onlyWaste;      // 우리가 돈 주는 상황
+
+  // 버튼 정의: [id, 활성조건]
+  const btnRules = {
+    '현금':    weReceive && !hasReturn,
+    '미수':    weReceive && !hasReturn,
+    '이체':    weReceive && !hasReturn,
+    '현금지급': wePay,
+    '이체지급': wePay,
+    '반품':    hasReturn,
+  };
+
+  Object.entries(btnRules).forEach(([pay, enabled]) => {
+    const btn = document.getElementById(`ipay-${pay}-${idx}`);
+    if(!btn) return;
+    btn.style.opacity = enabled ? '1' : '0.3';
+    btn.style.pointerEvents = enabled ? 'auto' : 'none';
+    btn.style.cursor = enabled ? 'pointer' : 'default';
+    // 비활성화된 버튼이 선택돼있으면 해제
+    if(!enabled && inlinePay[idx] === pay){
+      inlinePay[idx] = '';
+      btn.classList.remove('on');
+      const amtWrap = document.getElementById(`inline-payamt-wrap-${idx}`);
+      if(amtWrap) amtWrap.style.display = 'none';
+    }
+  });
+}
+
+// ── 헬퍼 함수들 ──
+let inlineWasteOn = {};
+let inlineWasteMode = {};
+let inlinePay = {};
+let inlineMisuOn = {};
+let inlineItemCount = {};
+
+function closeInlineForm(idx){
+  const card = document.getElementById(`ri-${idx}`);
+  if(card){
+    card.style.borderColor = '';
+    card.querySelector('.inline-delivery-form')?.remove();
+  }
+  delete inlineWasteOn[idx];
+  delete inlineWasteMode[idx];
+  delete inlinePay[idx];
+  delete inlineMisuOn[idx];
+  delete inlineItemCount[idx];
+}
+
+function onInlineTypeSearch(itemIdx, formIdx){
+  const q = (document.getElementById(`itype-${itemIdx}-${formIdx}`)?.value||'').trim().toLowerCase();
+  const dd = document.getElementById(`itdd-${itemIdx}-${formIdx}`);
+  if(!dd) return;
+  const opts = q ? getTypeOptions().filter(t=>t.toLowerCase().includes(q)) : getTypeOptions().slice(0,12);
+  dd.innerHTML = opts.map(t=>`<div class="type-opt" onmousedown="selectInlineType(${itemIdx},${formIdx},'${t}')">${t}</div>`).join('');
+  dd.classList.add('show');
+}
+
+function hideInlineDd(itemIdx, formIdx){
+  document.getElementById(`itdd-${itemIdx}-${formIdx}`)?.classList.remove('show');
+}
+
+function selectInlineType(itemIdx, formIdx, type){
+  const el = document.getElementById(`itype-${itemIdx}-${formIdx}`);
+  if(el) el.value = type;
+  hideInlineDd(itemIdx, formIdx);
+  const t = today();
+  const costPrice = getPriceAt(type, t) || 0;
+  const isFee = isFeeItem(type, t);
+  const isNeg = costPrice < 0;
+  const priceEl = document.getElementById(`iprice-${itemIdx}-${formIdx}`);
+  if(priceEl && !isFee && !isNeg && costPrice > 0) priceEl.value = costPrice;
+  // 수수료/음수면 단가 행 숨기기
+  const itemCard = document.getElementById(`inline-item-${itemIdx}-${formIdx}`);
+  if(itemCard){
+    const priceRow = itemCard.querySelector('.price-row');
+    if(priceRow) priceRow.style.display = (isFee || isNeg) ? 'none' : 'flex';
+    let badge = itemCard.querySelector('.fee-badge');
+    if(isFee || isNeg){
+      if(!badge){
+        badge = document.createElement('div');
+        badge.className = 'fee-badge';
+        badge.style.cssText = 'font-size:11px;color:var(--o);background:rgba(255,159,67,.08);border:1px solid rgba(255,159,67,.2);padding:5px 10px;border-radius:6px;margin-top:6px;';
+        itemCard.appendChild(badge);
+      }
+      badge.textContent = isNeg ? `수수료 수입 ${Math.abs(costPrice).toLocaleString()}원/통` : '수수료 품목 — 차감청구 없음';
+    } else {
+      badge?.remove();
+    }
+  }
+  calcInline(formIdx);
+  updateInlinePayBtns(formIdx);
+}
+
+function addInlineItem(formIdx){
+  const count = (inlineItemCount[formIdx] || 0) + 1;
+  inlineItemCount[formIdx] = count;
+  const container = document.getElementById(`inline-items-${formIdx}`);
+  if(!container) return;
+  container.insertAdjacentHTML('beforeend', `
+  <div class="inline-item" id="inline-item-${count}-${formIdx}" style="background:var(--card);border:1px solid var(--border);border-radius:9px;padding:10px 11px;margin-bottom:6px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <span style="font-size:10px;color:var(--p);">품목 ${count+1}</span>
+      <button onclick="removeInlineItem(${count},${formIdx})" style="padding:3px 8px;background:rgba(255,107,107,.1);border:none;border-radius:5px;color:var(--r);font-size:10px;cursor:pointer;">✕</button>
+    </div>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+      <div style="flex:1;position:relative;">
+        <input class="inp type-search-input" id="itype-${count}-${formIdx}" value="" placeholder="유종 검색..."
+          style="font-size:13px;padding:9px 11px;"
+          oninput="onInlineTypeSearch(${count},${formIdx})" onfocus="onInlineTypeSearch(${count},${formIdx})"
+          onblur="setTimeout(()=>hideInlineDd(${count},${formIdx}),150)" autocomplete="off">
+        <div class="type-dropdown" id="itdd-${count}-${formIdx}"></div>
+      </div>
+      <input class="inp" id="iqty-${count}-${formIdx}" type="number" placeholder="통수"
+        inputmode="numeric" style="width:68px;font-size:14px;padding:9px 10px;font-family:'JetBrains Mono',monospace;"
+        oninput="numOnlyNeg(this);calcInline(${formIdx});updateInlinePayBtns(${formIdx})">
+    </div>
+    <div class="price-row" style="display:flex;align-items:center;gap:6px;">
+      <span style="font-size:10px;color:var(--t2);white-space:nowrap;">판매단가</span>
+      <input class="inp" id="iprice-${count}-${formIdx}" type="number" placeholder="0"
+        inputmode="numeric" style="flex:1;font-size:13px;padding:9px 10px;font-family:'JetBrains Mono',monospace;"
+        oninput="numOnly(this);calcInline(${formIdx});updateInlinePayBtns(${formIdx})">
+      <span style="font-size:10px;color:var(--t3);">원</span>
+    </div>
+    <div id="imargin-${count}-${formIdx}" style="font-size:10px;margin-top:3px;"></div>
+  </div>`);
+}
+
+function removeInlineItem(itemIdx, formIdx){
+  document.getElementById(`inline-item-${itemIdx}-${formIdx}`)?.remove();
+  calcInline(formIdx);
+  updateInlinePayBtns(formIdx);
+}
+
+function toggleInlineWaste(idx){
+  inlineWasteOn[idx] = !inlineWasteOn[idx];
+  document.getElementById(`inline-waste-sw-${idx}`)?.classList.toggle('on', inlineWasteOn[idx]);
+  const fields = document.getElementById(`inline-waste-fields-${idx}`);
+  if(fields) fields.style.display = inlineWasteOn[idx] ? 'block' : 'none';
+  calcInline(idx);
+  updateInlinePayBtns(idx);
+}
+
+function setInlineWasteMode(idx, mode){
+  inlineWasteMode[idx] = mode;
+  ['calc','direct'].forEach(m => {
+    const btn = document.getElementById(`iwm-${m}-${idx}`);
+    const fields = document.getElementById(`iwaste-${m}-${idx}`);
+    if(btn){
+      const on = m === mode;
+      btn.style.borderColor = on ? 'var(--p)' : 'var(--border)';
+      btn.style.background = on ? 'rgba(108,143,255,.1)' : 'transparent';
+      btn.style.color = on ? 'var(--p)' : 'var(--t3)';
+    }
+    if(fields) fields.style.display = m === mode ? 'block' : 'none';
+  });
+  calcInline(idx);
+  updateInlinePayBtns(idx);
+}
+
+function toggleInlineMisu(idx){
+  inlineMisuOn[idx] = !inlineMisuOn[idx];
+  document.getElementById(`inline-misu-sw-${idx}`)?.classList.toggle('on', inlineMisuOn[idx]);
+  const fields = document.getElementById(`inline-misu-fields-${idx}`);
+  if(fields) fields.style.display = inlineMisuOn[idx] ? 'block' : 'none';
+  calcInline(idx);
+}
+
+function setInlinePay(idx, type){
+  inlinePay[idx] = type;
+  document.querySelectorAll(`#inline-pay-btns-${idx} .pay-btn`).forEach(b => b.classList.remove('on'));
+  document.getElementById(`ipay-${type}-${idx}`)?.classList.add('on');
+  const amtWrap = document.getElementById(`inline-payamt-wrap-${idx}`);
+  if(amtWrap) amtWrap.style.display = (type==='현금'||type==='이체') ? 'block' : 'none';
+}
+
+function getInlineItems(idx){
+  const items = [];
+  const t = today();
+  const process = (itemIdx) => {
+    const type  = document.getElementById(`itype-${itemIdx}-${idx}`)?.value||'';
+    const qty   = parseFloat(document.getElementById(`iqty-${itemIdx}-${idx}`)?.value)||0;
+    const priceEl = document.getElementById(`iprice-${itemIdx}-${idx}`);
+    const costP = getPriceAt(type, t) || 0;
+    const fee   = type ? isFeeItem(type, t) : false;
+    const price = (fee || costP < 0) ? 0 : (parseFloat(priceEl?.value) || costP);
+    if(type && qty !== 0) items.push({type, qty, price, isFee:fee, costPrice:costP});
+  };
+  process(0);
+  const count = inlineItemCount[idx] || 0;
+  for(let i = 1; i <= count; i++){
+    if(document.getElementById(`inline-item-${i}-${idx}`)) process(i);
+  }
+  return items;
+}
+
+function calcInline(idx){
+  const t = today();
+  const items = getInlineItems(idx);
+  const wasteOn   = inlineWasteOn[idx] || false;
+  const wasteMode = inlineWasteMode[idx] || 'calc';
+  const misuOn    = inlineMisuOn[idx] || false;
+
+  // 마진 표시
+  items.forEach((item, i) => {
+    const realIdx = i === 0 ? 0 : i;
+    const marginEl = document.getElementById(`imargin-${realIdx}-${idx}`);
+    if(!marginEl || item.isFee || item.costPrice < 0) return;
+    if(item.costPrice > 0){
+      const margin = (item.price - item.costPrice) * Math.abs(item.qty);
+      marginEl.textContent = item.qty < 0
+        ? `↩️ 반품 ${Math.abs(item.qty)}통`
+        : margin >= 0
+          ? `마진 ${margin.toLocaleString()}원 (+${(item.price-item.costPrice).toLocaleString()}원/통)`
+          : `⚠️ 손실 ${Math.abs(margin).toLocaleString()}원`;
+      marginEl.style.color = item.qty < 0 ? 'var(--o)' : margin >= 0 ? 'var(--g)' : 'var(--r)';
+    }
+  });
+
+  let oilTotal = 0, oilMargin = 0;
+  items.forEach(item => {
+    if(item.isFee || item.costPrice < 0){
+      oilMargin += Math.abs(item.costPrice) * Math.abs(item.qty);
+    } else {
+      oilTotal += item.price * item.qty;
+      oilMargin += (item.price - item.costPrice) * item.qty;
+    }
+  });
+
+  let wastePay = 0, wasteRev = 0, wasteKg = 0;
+  if(wasteOn){
+    if(wasteMode === 'calc'){
+      wasteKg = parseFloat(document.getElementById(`iwkg-${idx}`)?.value)||0;
+      const wp = parseFloat(document.getElementById(`iwprice-${idx}`)?.value)||getWastePriceAt(t);
+      wastePay = Math.round(wasteKg * wp);
+      wasteRev = Math.round(wasteKg * (getWastePriceAt(t) - wp));
+    } else {
+      wastePay = parseFloat(document.getElementById(`iwdirect-${idx}`)?.value)||0;
+    }
+  }
+
+  // 미수 차감
+  const misuDeduct = misuOn
+    ? (parseFloat(document.getElementById(`imisuamt-${idx}`)?.value) || 0) || (oilTotal - wastePay)
+    : 0;
+
+  const charge = oilTotal - wastePay - misuDeduct;
+  const totalProfit = oilMargin + wasteRev;
+
+  // 결과 표시
+  const resultEl = document.getElementById(`inline-result-${idx}`);
+  if(!resultEl) return;
+  if(items.length === 0 && !wasteOn){ resultEl.style.display='none'; return; }
+  resultEl.style.display = 'block';
+  resultEl.innerHTML = `
+    ${oilTotal>0?`<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="font-size:11px;color:var(--t2);">식유금액</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;">${oilTotal.toLocaleString()}원</span></div>`:''}
+    ${wastePay>0?`<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="font-size:11px;color:var(--t2);">폐유지급</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--o);">-${wastePay.toLocaleString()}원</span></div>`:''}
+    ${misuDeduct>0?`<div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="font-size:11px;color:var(--t2);">미수차감</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--r);">-${misuDeduct.toLocaleString()}원</span></div>`:''}
+    <div style="display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid var(--border);margin-top:3px;">
+      <span style="font-size:13px;font-weight:700;">청구</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:${charge>=0?'var(--y)':'var(--r)'};">${charge.toLocaleString()}원</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:3px 0;">
+      <span style="font-size:11px;color:var(--t2);">수익</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--g);">${totalProfit.toLocaleString()}원</span>
+    </div>`;
+}
+
+async function saveInlineDelivery(name, idx){
+  const t = today();
+  const items = getInlineItems(idx);
+  const wasteOn   = inlineWasteOn[idx] || false;
+  const wasteMode = inlineWasteMode[idx] || 'calc';
+  const pay       = inlinePay[idx] || '';
+  const misuOn    = inlineMisuOn[idx] || false;
+
+  if(items.length === 0 && !wasteOn){ showToast('품목 또는 폐유를 입력해주세요'); return; }
+  if(!pay){ showToast('수금 방법을 선택해주세요'); return; }
+
+  let oilTotal = 0, oilMargin = 0;
+  items.forEach(item => {
+    if(item.isFee || item.costPrice < 0) oilMargin += Math.abs(item.costPrice) * Math.abs(item.qty);
+    else { oilTotal += item.price * item.qty; oilMargin += (item.price - item.costPrice) * item.qty; }
+  });
+
+  let wastePay = 0, wasteRev = 0, wasteKg = 0, wastePriceVal = 0;
+  if(wasteOn){
+    if(wasteMode === 'calc'){
+      wasteKg = parseFloat(document.getElementById(`iwkg-${idx}`)?.value)||0;
+      wastePriceVal = parseFloat(document.getElementById(`iwprice-${idx}`)?.value)||getWastePriceAt(t);
+      wastePay = Math.round(wasteKg * wastePriceVal);
+      wasteRev = Math.round(wasteKg * (getWastePriceAt(t) - wastePriceVal));
+    } else {
+      wastePay = parseFloat(document.getElementById(`iwdirect-${idx}`)?.value)||0;
+    }
+  }
+
+  const misuDeduct = misuOn
+    ? (parseFloat(document.getElementById(`imisuamt-${idx}`)?.value)||0) || (oilTotal - wastePay)
+    : 0;
+
+  const charge = oilTotal - wastePay - misuDeduct;
+  const payAmt = parseFloat(document.getElementById(`ipayamt-${idx}`)?.value)||0;
+  const note   = document.getElementById(`inote-${idx}`)?.value||'';
+
+  // tx 구조 — 기존과 완전히 동일
+  const tx = {
+    id: `${t}_${EMP}_${name}_${Date.now()}`,
+    날짜: t,
+    시간: new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'}),
+    직원: EMP, 거래처: name,
+    유종: items.map(i => i.type).filter(Boolean).join('/'),
+    품목상세: JSON.stringify(items.map(i => ({type:i.type, qty:i.qty, price:i.price}))),
+    통수: items.reduce((s,i) => s + i.qty, 0),
+    판매단가: items.length===1 ? items[0].price : 0,
+    출고가: items.length===1 ? (items[0].costPrice||0) : 0,
+    폐유kg: wasteKg, 폐유매입단가: wastePriceVal,
+    식유금액: oilTotal, 폐유매입금: wastePay, 차감청구: charge,
+    식유마진: oilMargin, 폐유수익: wasteRev, 총수익: oilMargin + wasteRev,
+    수금방법: pay, 수금액: payAmt,
+    미수: pay==='미수' || pay==='반품',
+    비고: note
+  };
+
+  // 로컬 먼저
+  txList.unshift(tx);
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-7);
+  localStorage.setItem(`tx_${EMP}_v3`, JSON.stringify(
+    txList.filter(x=>x.날짜>=cutoff.toISOString().slice(0,10)).slice(0,500)
+  ));
+
+  // 반품 → 차량재고 복귀
+  items.filter(i=>i.qty<0).forEach(ri => {
+    const todayCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]');
+    const ex = todayCargos.find(c=>c.유종===ri.type&&c.거래처===name);
+    if(ex) ex.통수 = Math.max(0, ex.통수 + Math.abs(ri.qty));
+    else todayCargos.push({거래처:'', 유종:ri.type, 통수:Math.abs(ri.qty), 반품이월:true});
+    localStorage.setItem(`cargo_today_${EMP}`, JSON.stringify(todayCargos));
+  });
+
+  if(!completedRoutes.includes(name)) completedRoutes.push(name);
+  localStorage.setItem(`done_${EMP}_${t}`, JSON.stringify(completedRoutes));
+
+  // 현금/폐유 자동 입금
+  const s = stores.find(x=>x.이름===name);
+  if(pay==='현금'&&payAmt>0)
+    await savePayment({거래처:name,금액:payAmt,날짜:t,입금자명:s?.입금자||name,방법:'현금',비고:'현장현금수령'});
+  if((pay==='현금지급'||pay==='이체지급')&&wastePay>0)
+    await savePayment({거래처:name,금액:-wastePay,날짜:t,입금자명:'폐유대금',방법:pay==='이체지급'?'계좌이체':'현금지급',비고:'폐유대금지급'});
+
+  await safeFetch({type:'tx', tx}, () => {
+    closeInlineForm(idx);
+    showDeliverySuccess(name);
+    renderRoute();
+    updateDailyBar();
+    showReceiptButton(tx);
+  });
+}
+
+// ══════════════ DOM 보완 - son/bak.html HTML에 없는 엘리먼트 동적 생성 ══════════════
+(function fixEmpDOMIssues(){
+  const fix = () => {
+    // hist-month-label이 없으면 내역탭 헤더에 동적 추가
+    if(!document.getElementById('hist-month-label')){
+      const hdr = document.querySelector('#page-history .page-hdr > div');
+      if(hdr){
+        const lbl = document.createElement('div');
+        lbl.id = 'hist-month-label';
+        lbl.style.cssText = 'font-size:11px;color:var(--t3)';
+        hdr.appendChild(lbl);
+        // 값 채우기
+        const now = new Date();
+        lbl.textContent = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      }
+    }
+    // price-search input 숨기기
+    const priceSearch = document.getElementById('price-search');
+    if(priceSearch){
+      const wrap = priceSearch.closest('.inp-wrap');
+      if(wrap) wrap.style.display = 'none';
+    }
+  };
+  if(document.readyState === 'complete' || document.readyState === 'interactive'){
+    setTimeout(fix, 50);
+  } else {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(fix, 50));
+  }
+})();
+
+// ══════════════ 단가 보안 + 품목 렌더링 ══════════════
+
+// addItem 오버라이드 - 수수료/음수 출고가 자동처리
+const _origAddItem = typeof addItem === 'function' ? addItem : null;
+
+function addItem(typeVal, qtyVal, priceVal){
+  if(_origAddItem){
+    _origAddItem(typeVal, qtyVal, priceVal);
+  }
+  // 추가된 품목 카드에서 단가 필드 보안 적용
+  setTimeout(() => applyItemSecurity(), 50);
+}
+
+function applyItemSecurity(){
+  const t = today();
+  document.querySelectorAll('.item-card').forEach(card => {
+    const typeInput = card.querySelector('[id^="item-type-"], [id^="it-type-"], .type-search-input');
+    const priceInput = card.querySelector('[id^="item-price-"], [id^="it-price-"]');
+    if(!typeInput || !priceInput) return;
+
+    const typeName = typeInput.value || '';
+    if(!typeName) return;
+
+    const costPrice = getPriceAt(typeName, t) || 0;
+    const isFee = isFeeItem(typeName, t);
+    const isNegCost = costPrice < 0;
+
+    // 수수료 또는 음수 출고가 → 단가 필드 숨기고 배지 표시
+    if(isFee || isNegCost){
+      priceInput.closest('.inp-wrap')?.style && (priceInput.closest('.inp-wrap').style.display = 'none');
+      // 이미 배지 있으면 스킵
+      if(!card.querySelector('.fee-badge')){
+        const badge = document.createElement('div');
+        badge.className = 'fee-badge';
+        badge.style.cssText = 'font-size:11px;color:var(--o);background:rgba(255,159,67,.1);padding:4px 10px;border-radius:6px;margin-top:4px;';
+        badge.textContent = isNegCost ? `수수료 수입 ${Math.abs(costPrice).toLocaleString()}원/통` : '수수료 품목 (차감청구 없음)';
+        priceInput.closest('.inp-wrap')?.insertAdjacentElement('afterend', badge)
+          || card.appendChild(badge);
+      }
+    } else {
+      priceInput.closest('.inp-wrap')?.style && (priceInput.closest('.inp-wrap').style.display = '');
+      // 판매단가 음수 입력 차단
+      priceInput.addEventListener('input', function(){
+        const val = parseFloat(this.value);
+        if(val < 0){ this.value = 0; showToast('⚠️ 판매단가는 0 이상이어야 해요'); }
+      }, {once: false});
+      // 마진 음수 경고
+      const price = parseFloat(priceInput.value) || 0;
+      if(price > 0 && price < costPrice){
+        let warn = card.querySelector('.margin-warn');
+        if(!warn){
+          warn = document.createElement('div');
+          warn.className = 'margin-warn';
+          warn.style.cssText = 'font-size:10px;color:var(--r);margin-top:3px;';
+          priceInput.insertAdjacentElement('afterend', warn);
+        }
+        warn.textContent = `⚠️ 출고가(${costPrice.toLocaleString()}원)보다 낮음 — 마진 손실`;
+      } else {
+        card.querySelector('.margin-warn')?.remove();
+      }
+    }
+  });
+}
+
+// 단가 입력 시 실시간 보안 적용
+document.addEventListener('input', function(e){
+  if(e.target.matches('[id^="item-type-"], [id^="it-type-"], .type-search-input')){
+    setTimeout(() => applyItemSecurity(), 100);
+  }
+  if(e.target.matches('[id^="item-price-"], [id^="it-price-"]')){
+    applyItemSecurity();
+  }
+}, true);
+
+// ══════════════ 2단계: 거래처 카드 인라인 폼 ══════════════
 // openDelivery 오버라이드 - 전체화면 대신 카드 아래 인라인 펼침
 
 const _origOpenDelivery = typeof openDelivery === 'function' ? openDelivery : null;
@@ -1242,4 +1931,605 @@ async function saveInlineDelivery(name, idx){
   delete inlineWasteMode[idx];
   delete inlinePay[idx];
   delete inlineItemCount[idx];
+}
+
+// ══════════════ 수술 1: XSS 방어 ══════════════
+function sanitizeHTML(str){
+  return String(str||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;');
+}
+
+// ══════════════ 수술 2: 지사 필드 + stores 스키마 확장 ══════════════
+// stores 로드 시 지사 필드 없으면 기본값 보완
+(function patchStoresSchema(){
+  const orig = localStorage.getItem('stores_v3');
+  if(!orig) return;
+  try{
+    const arr = JSON.parse(orig);
+    let changed = false;
+    arr.forEach(s => {
+      if(!s.hasOwnProperty('지사')){ s.지사 = '본사'; changed = true; }
+      if(!s.hasOwnProperty('상태')){ s.상태 = '활성'; changed = true; }
+      if(!s.hasOwnProperty('매물여부')){ s.매물여부 = false; changed = true; }
+    });
+    if(changed) localStorage.setItem('stores_v3', JSON.stringify(arr));
+  }catch(e){}
+})();
+
+// ══════════════ 수술 3: 직원 접속코드 시스템 ══════════════
+// son/bak.html은 EMP가 하드코딩돼 있지만
+// 사장앱에서 직원코드 관리 가능하도록 기반 설계
+
+const EMP_SESSION_KEY = `emp_session_v1`;
+
+function getEmpSession(){
+  try{ return JSON.parse(localStorage.getItem(EMP_SESSION_KEY)||'null'); }
+  catch(e){ return null; }
+}
+
+function setEmpSession(name, code){
+  localStorage.setItem(EMP_SESSION_KEY, JSON.stringify({
+    name, code, loginAt: new Date().toISOString()
+  }));
+}
+
+function clearEmpSession(){
+  localStorage.removeItem(EMP_SESSION_KEY);
+}
+
+// 직원 검증 (GAS에서 직원 목록 받아서 대조)
+// 현재는 EMP 하드코딩 유지 + 세션 기록만
+// 나중에 son.html EMP 변수를 세션에서 읽도록 전환 가능
+(function initEmpSession(){
+  const session = getEmpSession();
+  if(!session){
+    // 최초 접속 시 현재 EMP로 세션 생성
+    if(typeof EMP !== 'undefined'){
+      setEmpSession(EMP, '');
+    }
+  }
+})();
+
+// ══════════════ 수술 4: 오프라인 큐 보완 ══════════════
+// son.html 원본에 enqueue가 있지만 
+// patch.js 로드 타이밍 문제로 누락될 수 있어 보완
+
+(function ensureQueueSystem(){
+  if(typeof window._queuePatched !== 'undefined') return;
+  window._queuePatched = true;
+
+  const QKEY = typeof QUEUE_KEY !== 'undefined' ? QUEUE_KEY : `unsent_${typeof EMP !== 'undefined' ? EMP : 'emp'}`;
+
+  // enqueue가 없으면 정의
+  if(typeof window.enqueue === 'undefined'){
+    window.enqueue = function(item){
+      const q = JSON.parse(localStorage.getItem(QKEY)||'[]');
+      q.push({...item, _queuedAt: new Date().toISOString()});
+      localStorage.setItem(QKEY, JSON.stringify(q));
+      updateQueueBadge && updateQueueBadge();
+    };
+  }
+
+  // safeFetch가 없으면 정의
+  if(typeof window.safeFetch === 'undefined'){
+    window.safeFetch = async function(payload, onSuccess){
+      const API_URL = typeof API !== 'undefined' ? API : '';
+      if(!API_URL){ console.error('API URL 없음'); return false; }
+      const id = Date.now()+'_'+Math.floor(Math.random()*9999);
+      try{
+        const res = await fetch(API_URL, {
+          method:'POST',
+          headers:{'Content-Type':'text/plain'},
+          body: JSON.stringify(payload)
+        });
+        const d = await res.json();
+        if(d.ok === false) throw new Error(d.error||'서버오류');
+        if(onSuccess) onSuccess();
+        return true;
+      }catch(e){
+        const q = JSON.parse(localStorage.getItem(QKEY)||'[]');
+        q.push({_id:id, _payload:payload, _queuedAt:new Date().toISOString()});
+        localStorage.setItem(QKEY, JSON.stringify(q));
+        if(typeof showToast === 'function') showToast('📴 오프라인 저장 (나중에 자동 전송)');
+        if(onSuccess) onSuccess();
+        return false;
+      }
+    };
+  }
+})();
+
+// ══════════════ 수술 5: stores 로드 시 지사 필드 init 오버라이드 ══════════════
+// init() 완료 후 stores에 지사 필드 보완
+const _origInit = typeof init === 'function' ? init : null;
+
+async function init(){
+  if(_origInit) await _origInit();
+  // stores 지사 필드 보완
+  if(typeof stores !== 'undefined' && stores.length > 0){
+    let changed = false;
+    stores.forEach(s => {
+      if(!s.hasOwnProperty('지사')){ s.지사 = '본사'; changed = true; }
+      if(!s.hasOwnProperty('상태')){ s.상태 = '활성'; changed = true; }
+      if(!s.hasOwnProperty('매물여부')){ s.매물여부 = false; changed = true; }
+    });
+    if(changed) localStorage.setItem('stores_v3', JSON.stringify(stores));
+  }
+}
+
+// ══════════════ 스키마 확장 v2 ══════════════
+// 거래처 필드 완전 정의
+const STORE_SCHEMA_DEFAULTS = {
+  코드: '',
+  이름: '',
+  담당: '',
+  요일: '',
+  유종: '',
+  연락처: '',
+  입금자: '',
+  계좌: '',
+  비고: '',
+  // v2 추가
+  지사: '본사',
+  상태: '활성',          // 활성/비활성/휴업
+  배정상태: '정착',      // 정착/신규배정/긴급배정
+  배정직원: '',          // 긴급배정 시 담당과 별개
+  배정날짜: '',          // 긴급배정 날짜
+  매물여부: false,
+  메모: '',
+  미수한도: 0,
+};
+
+function normalizeStore(s){
+  const result = {...STORE_SCHEMA_DEFAULTS};
+  Object.keys(s).forEach(k => { if(s[k] !== undefined) result[k] = s[k]; });
+  return result;
+}
+
+// ── 긴급배정 감지 + 루트 표시 ──
+let _lastUrgentCheck = '';
+
+function checkUrgentAssignments(){
+  if(typeof stores === 'undefined') return;
+  const t = today();
+  const empName = typeof EMP !== 'undefined' ? EMP : '';
+
+  // 나한테 긴급배정된 거래처 찾기
+  const urgent = stores.filter(s =>
+    s.배정상태 === '긴급배정' &&
+    s.배정날짜 === t &&
+    (s.배정직원 === empName || s.담당 === empName) &&
+    s.상태 === '활성' &&
+    !completedRoutes.includes(s.이름)
+  );
+
+  if(!urgent.length) return;
+
+  // 이미 처리한 거면 스킵
+  const urgentKey = urgent.map(s=>s.이름).sort().join(',');
+  if(urgentKey === _lastUrgentCheck) return;
+  _lastUrgentCheck = urgentKey;
+
+  // 루트 재렌더 (긴급 거래처 포함)
+  renderRoute();
+
+  // 알림 토스트
+  if(typeof showToast === 'function'){
+    showToast(`🚨 긴급 배정 ${urgent.length}건 — ${urgent.map(s=>s.이름).join(', ')}`);
+  }
+}
+
+// renderRoute 오버라이드 — 긴급배정 뱃지 추가
+const _origRenderRoute2 = typeof renderRoute === 'function' ? renderRoute : null;
+
+function renderRoute(){
+  // 기존 renderRoute 실행
+  if(_origRenderRoute2) _origRenderRoute2();
+
+  // 긴급배정 뱃지 추가
+  const t = today();
+  const empName = typeof EMP !== 'undefined' ? EMP : '';
+  if(typeof stores === 'undefined') return;
+
+  stores.forEach(s => {
+    if(s.배정상태 !== '긴급배정' && s.배정상태 !== '신규배정') return;
+    if(s.배정날짜 !== t && s.배정상태 !== '신규배정') return;
+
+    // 루트 아이템 찾기
+    const allItems = document.querySelectorAll('.route-item');
+    allItems.forEach(item => {
+      const nameEl = item.querySelector('.route-name');
+      if(!nameEl) return;
+      if(!nameEl.textContent.includes(s.이름)) return;
+      if(item.querySelector('.urgent-badge')) return; // 이미 있으면 스킵
+
+      const badge = document.createElement('span');
+      badge.className = 'urgent-badge';
+      badge.style.cssText = s.배정상태 === '긴급배정'
+        ? 'font-size:9px;font-weight:700;color:#ff5757;background:rgba(255,87,87,.15);padding:2px 6px;border-radius:10px;margin-left:4px;'
+        : 'font-size:9px;font-weight:700;color:#ff9f43;background:rgba(255,159,67,.15);padding:2px 6px;border-radius:10px;margin-left:4px;';
+      badge.textContent = s.배정상태 === '긴급배정' ? '🚨 긴급' : '🆕 신규';
+      nameEl.appendChild(badge);
+
+      // 긴급은 카드 테두리도 강조
+      if(s.배정상태 === '긴급배정'){
+        item.style.borderColor = 'var(--r)';
+        item.style.borderWidth = '1.5px';
+      }
+    });
+  });
+}
+
+// ── saveNewStore 오버라이드 — 배정상태 신규배정으로 ──
+const _origSaveNewStore = typeof saveNewStore === 'function' ? saveNewStore : null;
+
+async function saveNewStore(){
+  const name = document.getElementById('ns-name')?.value?.trim();
+  if(!name) return;
+
+  if(_origSaveNewStore) {
+    await _origSaveNewStore();
+  }
+
+  // 방금 등록한 거래처 찾아서 배정상태 업데이트
+  const s = stores.find(x => x.이름 === name);
+  if(s){
+    s.배정상태 = '신규배정';
+    s.배정날짜 = today();
+    s.배정직원 = typeof EMP !== 'undefined' ? EMP : '';
+    s.지사 = s.지사 || '본사';
+    s.상태 = s.상태 || '활성';
+    localStorage.setItem('stores_v3', JSON.stringify(stores));
+
+    // GAS에 배정상태 업데이트 전송
+    if(typeof safeFetch === 'function'){
+      safeFetch({
+        type: 'store_update',
+        store: {이름: name, 배정상태: '신규배정', 배정날짜: today(), 배정직원: s.배정직원}
+      }, null);
+    }
+  }
+}
+
+// ── 30초 싱크에서 긴급배정 감지 ──
+// 기존 30초 싱크(setInterval)가 있으면 거기에 편승
+// 없으면 별도로 30초마다 체크
+(function startUrgentCheck(){
+  // 즉시 한 번
+  setTimeout(checkUrgentAssignments, 2000);
+  // 30초마다
+  setInterval(checkUrgentAssignments, 30000);
+})();
+
+// ── 직원 접속코드 시스템 ──
+const EMP_CODES_KEY = 'emp_codes_v1'; // 사장앱에서 관리
+
+function getEmpFromCode(code){
+  try{
+    const codes = JSON.parse(localStorage.getItem(EMP_CODES_KEY)||'{}');
+    return codes[code] || null; // {이름, 지사, 직급, 상태}
+  }catch(e){ return null; }
+}
+
+// 현재는 EMP 하드코딩 유지
+// 나중에 son.html 교체 시 이 함수로 EMP 결정
+// const empData = getEmpFromCode(inputCode);
+// if(empData && empData.상태 === '재직') { EMP = empData.이름; }
+
+// ── 삭제 예정 기능 비활성화 ──
+// X1. 엑셀 업로드 — 숨김
+(function hideExcelUpload(){
+  const fix = () => {
+    const excelBtn = document.getElementById('pmode-excel');
+    if(excelBtn){ excelBtn.style.display = 'none'; }
+    const excelSection = document.getElementById('pay-excel-section');
+    if(excelSection){ excelSection.style.display = 'none'; }
+  };
+  if(document.readyState === 'complete') setTimeout(fix, 100);
+  else document.addEventListener('DOMContentLoaded', () => setTimeout(fix, 100));
+})();
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// © 2025 제이제이컴퍼니 All rights reserved.
+// 무단 복제, 배포, 수정을 금지합니다.
+// JJ Company - Oil Distribution Management System
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// ══════════════ 보안 1: 직원앱 세션 검증 ══════════════
+(function enforceEmpSession(){
+  // EMP가 정의된 파일(son/bak.html)에서만 동작
+  if(typeof EMP === 'undefined') return;
+
+  // 세션 확인
+  const session = JSON.parse(localStorage.getItem('emp_session_v1')||'null');
+  const now = new Date();
+
+  // 세션 없거나 만료(24시간) 시 재설정
+  if(!session || !session.name){
+    localStorage.setItem('emp_session_v1', JSON.stringify({
+      name: EMP,
+      loginAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 24*60*60*1000).toISOString()
+    }));
+    return;
+  }
+
+  // 세션 만료 체크
+  if(new Date(session.expiresAt) < now){
+    localStorage.removeItem('emp_session_v1');
+    // 세션 갱신
+    localStorage.setItem('emp_session_v1', JSON.stringify({
+      name: EMP,
+      loginAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + 24*60*60*1000).toISOString()
+    }));
+  }
+
+  // 세션의 이름과 EMP가 다르면 차단
+  // (나중에 접속코드 시스템 붙으면 여기서 검증)
+  if(session.name && session.name !== EMP){
+    // 로그 기록 (GAS로 비정상 접근 전송)
+    try{
+      fetch(typeof API !== 'undefined' ? API : '', {
+        method:'POST',
+        headers:{'Content-Type':'text/plain'},
+        body: JSON.stringify({
+          type: 'security_log',
+          log: {
+            event: 'session_mismatch',
+            expected: EMP,
+            found: session.name,
+            at: now.toISOString(),
+            ua: navigator.userAgent.slice(0,100)
+          }
+        })
+      }).catch(()=>{});
+    }catch(e){}
+  }
+})();
+
+// ══════════════ 보안 2: API 요청 토큰 ══════════════
+// GAS 요청에 타임스탬프 + 해시 포함
+// → GAS에서 5분 이내 요청만 허용
+
+function getRequestToken(){
+  const ts = Date.now();
+  // 간단한 토큰: 타임스탬프 + EMP 조합
+  // GAS에서 동일한 방식으로 검증
+  const raw = `${ts}_${typeof EMP !== 'undefined' ? EMP : 'unknown'}_jjco2025`;
+  // btoa로 인코딩 (난독화 수준)
+  const token = btoa(raw).replace(/=/g,'');
+  return {ts, token};
+}
+
+// safeFetch 보안 래퍼
+const _origSafeFetch = typeof safeFetch === 'function' ? safeFetch : null;
+
+async function safeFetch(payload, onSuccess){
+  // 요청 토큰 추가
+  const {ts, token} = getRequestToken();
+  const securePayload = {
+    ...payload,
+    _ts: ts,
+    _token: token,
+    _emp: typeof EMP !== 'undefined' ? EMP : 'unknown'
+  };
+
+  if(_origSafeFetch){
+    return _origSafeFetch(securePayload, onSuccess);
+  }
+
+  // fallback
+  const API_URL = typeof API !== 'undefined' ? API : '';
+  if(!API_URL) return false;
+  try{
+    const res = await fetch(API_URL, {
+      method:'POST',
+      headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify(securePayload)
+    });
+    const d = await res.json();
+    if(d.ok === false) throw new Error(d.error||'서버오류');
+    if(onSuccess) onSuccess();
+    return true;
+  }catch(e){
+    if(typeof enqueue === 'function') enqueue({_id:Date.now(), _payload:securePayload});
+    if(typeof showToast === 'function') showToast('📴 오프라인 저장');
+    if(onSuccess) onSuccess();
+    return false;
+  }
+}
+
+// ══════════════ 보안 3: 데이터 변조 감지 ══════════════
+// txList 로드 시 무결성 체크
+
+function verifyTxIntegrity(){
+  if(typeof txList === 'undefined') return;
+  const suspicious = txList.filter(tx => {
+    // 비정상 패턴 감지
+    if(!tx.날짜 || !tx.직원 || !tx.거래처) return true;
+    if(typeof tx.차감청구 === 'undefined') return true;
+    // 직원명이 EMP와 다른 tx가 로컬에 있으면 의심
+    if(typeof EMP !== 'undefined' && tx.직원 !== EMP) return true;
+    return false;
+  });
+  if(suspicious.length > 0){
+    console.warn(`⚠️ 의심 tx ${suspicious.length}건 감지`);
+    // 타 직원 tx 필터 (로컬에서 제거, 서버엔 있음)
+    if(typeof EMP !== 'undefined'){
+      const filtered = txList.filter(tx => tx.직원 === EMP || !tx.직원);
+      if(filtered.length !== txList.length){
+        txList.length = 0;
+        filtered.forEach(tx => txList.push(tx));
+        localStorage.setItem(
+          `tx_${EMP}_v3`,
+          JSON.stringify(filtered)
+        );
+      }
+    }
+  }
+}
+
+// 앱 시작 후 검증
+setTimeout(verifyTxIntegrity, 1000);
+
+// ══════════════ 보안 4: 개발자 도구 감지 ══════════════
+// 운영 환경에서 콘솔 경고
+(function devToolsWarning(){
+  const warn = () => {
+    console.log(
+      '%c⚠️ 제이제이컴퍼니 내부 시스템',
+      'color:#ff5757;font-size:16px;font-weight:bold;'
+    );
+    console.log(
+      '%c이 콘솔을 통한 데이터 조작은 법적 책임이 따릅니다.',
+      'color:#ff9f43;font-size:12px;'
+    );
+    console.log(
+      '%c© 2025 제이제이컴퍼니 All rights reserved.',
+      'color:#7a7f94;font-size:11px;'
+    );
+  };
+  warn();
+})();
+
+// ══════════════ 3단계: 계근/상차 여러 번 가능 ══════════════
+
+// 출근탭 UI 오버라이드
+// 기존: 저장하면 폼 초기화되고 끝
+// 변경: 저장 후 "오늘 저장된 내역" + "추가 계근/상차" 버튼 유지
+
+const _origSaveCheckin = typeof saveCheckin === 'function' ? saveCheckin : null;
+
+async function saveCheckin(){
+  // 기존 로직 그대로 실행
+  if(_origSaveCheckin) await _origSaveCheckin();
+
+  // 저장 후 추가 버튼 표시
+  setTimeout(() => renderCheckinAddBtn(), 200);
+}
+
+function renderCheckinAddBtn(){
+  // 이미 있으면 스킵
+  if(document.getElementById('checkin-add-btn')) return;
+
+  const history = document.getElementById('checkin-history');
+  if(!history) return;
+
+  const btn = document.createElement('button');
+  btn.id = 'checkin-add-btn';
+  btn.className = 'btn-add';
+  btn.style.marginTop = '10px';
+  btn.textContent = '+ 오후 계근 / 상차 추가';
+  btn.onclick = () => {
+    // 폼 초기화해서 다시 입력 가능하게
+    if(typeof pallets !== 'undefined') pallets.length = 0;
+    if(typeof cargos !== 'undefined') cargos.length = 0;
+    if(typeof palletId !== 'undefined') window.palletId = 0;
+    if(typeof cargoId !== 'undefined') window.cargoId = 0;
+
+    const palletList = document.getElementById('pallet-list');
+    const cargoList = document.getElementById('cargo-list');
+    const wasteBox = document.getElementById('waste-total-box');
+    const stockSummary = document.getElementById('stock-summary');
+    const summaryBar = document.getElementById('checkin-summary-bar');
+
+    if(palletList) palletList.innerHTML = '';
+    if(cargoList) cargoList.innerHTML = '';
+    if(wasteBox) wasteBox.style.display = 'none';
+    if(stockSummary) stockSummary.style.display = 'none';
+    if(summaryBar) summaryBar.style.display = 'none';
+
+    // 추가 버튼 제거 (저장 후 다시 생김)
+    btn.remove();
+
+    // 스크롤 위로
+    document.getElementById('page-checkin')?.scrollTo({top:0, behavior:'smooth'});
+
+    showToast('📦 추가 계근/상차 입력 가능합니다');
+  };
+
+  history.insertAdjacentElement('afterend', btn);
+}
+
+// 앱 시작 시 오늘 이미 저장된 내역 있으면 추가 버튼 표시
+(function initCheckinAddBtn(){
+  const fix = () => {
+    const t = today ? today() : new Date().toISOString().slice(0,10);
+    const logs = JSON.parse(localStorage.getItem(
+      `checkin_log_${typeof EMP !== 'undefined' ? EMP : ''}_${t}`
+    ) || '[]');
+    if(logs.length > 0) setTimeout(renderCheckinAddBtn, 500);
+  };
+  if(document.readyState === 'complete') fix();
+  else document.addEventListener('DOMContentLoaded', fix);
+})();
+
+// ── 출근탭 헤더에 오늘 누적 현황 표시 ──
+const _origRenderCheckinHistory = typeof renderCheckinHistory === 'function' ? renderCheckinHistory : null;
+
+function renderCheckinHistory(){
+  // 기존 로직 실행
+  if(_origRenderCheckinHistory) _origRenderCheckinHistory();
+
+  // 추가 버튼 유지
+  const t = today ? today() : new Date().toISOString().slice(0,10);
+  const logs = JSON.parse(localStorage.getItem(
+    `checkin_log_${typeof EMP !== 'undefined' ? EMP : ''}_${t}`
+  ) || '[]');
+  if(logs.length > 0) setTimeout(renderCheckinAddBtn, 100);
+
+  // 오늘 누적 현황 헤더 업데이트
+  renderCheckinDaySummary(logs);
+}
+
+function renderCheckinDaySummary(logs){
+  if(!logs || !logs.length) return;
+
+  let summaryEl = document.getElementById('checkin-day-summary');
+  if(!summaryEl){
+    summaryEl = document.createElement('div');
+    summaryEl.id = 'checkin-day-summary';
+    summaryEl.style.cssText = `
+      background:var(--card2);border:1px solid var(--border);
+      border-radius:12px;padding:11px 13px;margin-bottom:10px;
+    `;
+    const pageHdr = document.querySelector('#page-checkin .page-hdr');
+    if(pageHdr) pageHdr.insertAdjacentElement('afterend', summaryEl);
+  }
+
+  // 누적 집계
+  let totalKg = 0, totalIncome = 0, totalPallets = 0;
+  const stockMap = {};
+  logs.forEach(log => {
+    totalKg += log.폐유?.실중량 || 0;
+    totalIncome += log.폐유?.수입 || 0;
+    totalPallets += log.폐유?.파레트수 || 0;
+    (log.상차||[]).forEach(c => {
+      if(c.유종 && c.통수) stockMap[c.유종] = (stockMap[c.유종]||0) + c.통수;
+    });
+  });
+
+  const sessionCount = logs.length;
+  const stockText = Object.entries(stockMap).map(([t,q])=>`${t} ${q}통`).join(' · ') || '없음';
+
+  summaryEl.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="font-size:10px;font-weight:700;color:var(--t3);letter-spacing:.1em;">오늘 누적 (${sessionCount}회 저장)</div>
+      <div style="font-size:10px;color:var(--t3);">${new Date().toLocaleDateString('ko-KR')}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+      <div style="background:rgba(255,159,67,.06);border:1px solid rgba(255,159,67,.15);border-radius:9px;padding:9px 11px;">
+        <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">♻️ 폐유 누적</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--o);">${totalKg.toFixed(1)}kg</div>
+        <div style="font-size:10px;color:var(--g);margin-top:2px;">${totalIncome.toLocaleString()}원</div>
+      </div>
+      <div style="background:rgba(108,143,255,.06);border:1px solid rgba(108,143,255,.15);border-radius:9px;padding:9px 11px;">
+        <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">🚛 상차 누적</div>
+        <div style="font-size:12px;font-weight:700;color:var(--p);line-height:1.4;">${stockText}</div>
+      </div>
+    </div>`;
 }

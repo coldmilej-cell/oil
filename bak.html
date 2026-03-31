@@ -145,7 +145,7 @@ select option{background:#181c24;}
   <div class="tab"     onclick="goTab('delivery')">📦 납품</div>
   <div class="tab"     onclick="goTab('payment')">💳 입금</div>
   <div class="tab"     onclick="goTab('history')">📋 내역</div>
-  <div class="tab"     onclick="goTab('prices');setTimeout(()=>renderPriceTab(),50)">💰 단가</div>
+  <div class="tab"     onclick="goTab('prices');setTimeout(function(){if(typeof renderPriceTab==='function')renderPriceTab();},80)">💰 단가</div>
 </div>
 
 <!-- 출근 -->
@@ -519,18 +519,23 @@ select option{background:#181c24;}
     </div>
   </div>
   <!-- 월 선택 + 거래처 검색 -->
-  <div style="background:var(--card2);border-radius:12px;padding:10px 12px;margin-bottom:10px;">
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-      <span style="font-size:11px;color:var(--t3);min-width:24px;">월</span>
-      <input type="month" id="hist-month-sel"
-        style="flex:1;background:transparent;border:none;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
-        onchange="onHistMonthChange()">
+  <div style="background:var(--card2);border-radius:12px;padding:12px;margin-bottom:10px;">
+    <div style="font-size:10px;color:var(--t3);margin-bottom:8px;letter-spacing:.5px;">조회 기간</div>
+    <div style="display:flex;gap:8px;">
+      <div style="flex:1;">
+        <div style="font-size:9px;color:var(--t3);margin-bottom:4px;">월</div>
+        <input type="month" id="hist-month-sel"
+          style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
+          onchange="onHistMonthChange()">
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:9px;color:var(--t3);margin-bottom:4px;">일 (선택)</div>
+        <input type="date" id="hist-date-sel"
+          style="width:100%;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
+          onchange="onHistDateChange()">
+      </div>
     </div>
-    <div style="height:1px;background:var(--border);margin:0 -4px 8px;"></div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span style="font-size:11px;color:var(--t3);min-width:24px;">일</span>
-      <div style="display:flex;gap:4px;flex:1;flex-wrap:wrap;" id="hist-day-btns"></div>
-    </div>
+    <div style="margin-top:8px;font-size:10px;color:var(--t3);">💡 월만 선택하면 한달 전체 · 일 선택하면 해당일만</div>
   </div>
   <!-- 거래처 검색 -->
   <div style="position:relative;margin-bottom:10px;">
@@ -2455,7 +2460,6 @@ function onHistDateChange(){
 }
 
 async function renderHistory(){
-  if(typeof renderHistDayBtns==="function") renderHistDayBtns(typeof _histSelectedDay!=="undefined"?_histSelectedDay:"");
   const now=new Date();
   const defaultMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const selEl=document.getElementById('hist-month-sel');
@@ -2479,8 +2483,8 @@ async function renderHistory(){
   }
 
   // 거래처 검색 필터
-  if(typeof _histSelectedDay !== 'undefined' && _histSelectedDay)
-    list = list.filter(t => String(t.날짜||'').slice(8,10) === _histSelectedDay);
+  var _histDate = (document.getElementById('hist-date-sel')?.value||'').trim();
+  if(_histDate) list = list.filter(function(t){ return String(t.날짜||'').slice(0,10) === _histDate; });
   const histStoreQ = (document.getElementById('hist-store-search')?.value||'').trim();
   if(histStoreQ) list = list.filter(t => (t.거래처||'').includes(histStoreQ));
 

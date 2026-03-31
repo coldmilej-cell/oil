@@ -148,6 +148,7 @@ select option{background:#161b22;}
 <div class="tabs">
   <div class="tab on"  onclick="goTab('dashboard')">📊 현황</div>
   <div class="tab"     onclick="goTab('history')">📋 내역</div>
+  <div class="tab"     onclick="goTab('dispatch')">🚗 배차</div>
   <div class="tab"     onclick="goTab('stores')">🏪 거래처</div>
   <div class="tab"     onclick="goTab('prices')">💰 단가</div>
 </div>
@@ -261,91 +262,89 @@ select option{background:#161b22;}
 </div>
 
 <!-- 거래처 -->
+<!-- 배차 -->
+<div class="page" id="page-dispatch">
+  <div class="page-hdr">
+    <div class="page-title">🚗 배차 관리</div>
+    <div style="font-size:11px;color:var(--t2);" id="dispatch-date"></div>
+  </div>
+
+  <!-- 배차 입력 카드 -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;">
+    <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px;letter-spacing:.08em;">직원 선택</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px;">
+      <div id="dbtn-손호영" onclick="selectDispatchEmp('손호영')"
+        style="flex:1;padding:11px;text-align:center;border-radius:10px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">
+        👤 손호영
+      </div>
+      <div id="dbtn-박기빈" onclick="selectDispatchEmp('박기빈')"
+        style="flex:1;padding:11px;text-align:center;border-radius:10px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;">
+        👤 박기빈
+      </div>
+    </div>
+    <input type="hidden" id="dispatch-emp" value="">
+
+    <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px;letter-spacing:.08em;">거래처 검색</div>
+    <div style="position:relative;margin-bottom:8px;">
+      <input type="text" id="dispatch-store-q" placeholder="거래처 검색 또는 신규 입력..."
+        style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:11px 13px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+        oninput="onDispatchSearch()" onfocus="onDispatchSearch()"
+        onblur="setTimeout(()=>document.getElementById('dispatch-dd').style.display='none',150)"
+        autocomplete="off">
+      <div id="dispatch-dd" style="position:absolute;top:100%;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:10px;z-index:100;max-height:200px;overflow-y:auto;display:none;margin-top:2px;"></div>
+    </div>
+
+    <!-- 거래처 정보 수정 패널 -->
+    <div id="dispatch-info-panel" style="display:none;background:var(--card2);border:1.5px solid var(--p);border-radius:10px;padding:12px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:11px;font-weight:700;color:var(--p);" id="dispatch-panel-label">거래처 정보 확인/수정</div>
+        <div id="dispatch-new-badge" style="display:none;font-size:10px;background:rgba(61,220,132,.15);color:var(--g);border:1px solid var(--g);border-radius:6px;padding:2px 7px;font-weight:700;">🆕 신규</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">유종</div>
+          <input type="text" id="dispatch-유종" placeholder="예: 하이골드"
+            style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">방문요일</div>
+          <select id="dispatch-요일"
+            style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;-webkit-appearance:none;">
+            <option value="">없음</option>
+            <option>월</option><option>화</option><option>수</option><option>목</option><option>금</option>
+          </select>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">연락처</div>
+          <input type="text" id="dispatch-연락처" placeholder="010-0000-0000"
+            style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;">
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">입금자명</div>
+          <input type="text" id="dispatch-입금자" placeholder="통장에 찍히는 이름"
+            style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;">
+        </div>
+      </div>
+    </div>
+
+    <button onclick="addDispatch()"
+      style="width:100%;padding:13px;background:var(--p2);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+      + 배차 추가
+    </button>
+  </div>
+
+  <!-- 오늘 배차 목록 -->
+  <div style="font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.1em;margin-bottom:8px;">오늘 배차 현황</div>
+  <div id="dispatch-list"></div>
+</div>
+
 <div class="page" id="page-stores">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0 4px">
     <div class="page-title">🏪 거래처 관리</div>
-    <button onclick="openStoreAdd()" style="padding:9px 14px;background:var(--y2);border:none;border-radius:10px;color:#000;font-size:12px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif">+ 추가</button>
+    <button onclick="openStoreAdd()" style="padding:9px 16px;background:var(--p2);border:none;border-radius:10px;color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">+ 추가</button>
   </div>
-
-    <!-- 배차 섹션 -->
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:14px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div style="font-size:13px;font-weight:700;color:var(--y);">🚗 오늘 배차</div>
-      <div style="font-size:11px;color:var(--t2);" id="dispatch-date"></div>
-    </div>
-
-    <!-- 배차 입력 -->
-    <div id="dispatch-form" style="margin-bottom:10px;">
-
-      <!-- 거래처 검색 + 직원 선택 -->
-      <div style="display:flex;gap:6px;margin-bottom:8px;">
-        <div style="flex:1;position:relative;">
-          <input type="text" id="dispatch-store-q" placeholder="거래처 검색 또는 신규 입력..."
-            style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:9px;padding:9px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
-            oninput="onDispatchSearch()" onfocus="onDispatchSearch()"
-            onblur="setTimeout(()=>document.getElementById('dispatch-dd').style.display='none',150)"
-            autocomplete="off">
-          <div id="dispatch-dd" style="position:absolute;top:100%;left:0;right:0;background:var(--card);border:1.5px solid var(--border);border-radius:9px;z-index:100;max-height:160px;overflow-y:auto;display:none;margin-top:2px;"></div>
-        </div>
-        <div style="display:flex;gap:5px;">
-          <div id="dbtn-손호영" onclick="selectDispatchEmp('손호영')"
-            style="padding:9px 10px;text-align:center;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;white-space:nowrap;">
-            손호영
-          </div>
-          <div id="dbtn-박기빈" onclick="selectDispatchEmp('박기빈')"
-            style="padding:9px 10px;text-align:center;border-radius:8px;border:1.5px solid var(--border);background:var(--card2);color:var(--t2);font-size:12px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif;transition:all .15s;white-space:nowrap;">
-            박기빈
-          </div>
-        </div>
-        <input type="hidden" id="dispatch-emp" value="">
-      </div>
-
-      <!-- 거래처 정보 수정 패널 (선택 시 표시) -->
-      <div id="dispatch-info-panel" style="display:none;background:var(--card2);border:1.5px solid var(--p);border-radius:10px;padding:12px;margin-bottom:8px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <div style="font-size:11px;font-weight:700;color:var(--p);" id="dispatch-panel-label">거래처 정보</div>
-          <div id="dispatch-new-badge" style="display:none;font-size:10px;background:rgba(61,220,132,.15);color:var(--g);border:1px solid var(--g);border-radius:6px;padding:2px 7px;font-weight:700;">🆕 신규</div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          <div>
-            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">유종</div>
-            <input type="text" id="dispatch-유종"
-              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"
-              placeholder="예: 하이골드">
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">방문요일</div>
-            <select id="dispatch-요일"
-              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;-webkit-appearance:none;">
-              <option value="">없음</option>
-              <option>월</option><option>화</option><option>수</option>
-              <option>목</option><option>금</option>
-            </select>
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">연락처</div>
-            <input type="text" id="dispatch-연락처"
-              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"
-              placeholder="010-0000-0000">
-          </div>
-          <div>
-            <div style="font-size:10px;color:var(--t2);margin-bottom:3px;">입금자명</div>
-            <input type="text" id="dispatch-입금자"
-              style="width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:7px 9px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;"
-              placeholder="통장에 찍히는 이름">
-          </div>
-        </div>
-      </div>
-
-      <button onclick="addDispatch()"
-        style="width:100%;padding:11px;background:var(--p2);color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
-        + 배차 추가
-      </button>
-    </div>
-
-    <!-- 오늘 배차 목록 -->
-    <div id="dispatch-list"></div>
-  </div>
+  <!-- 통계 바 -->
+  <div id="store-stats-bar" style="display:flex;gap:6px;margin-bottom:12px;"></div>
 
   <!-- 검색 -->
   <div class="search-wrap">
@@ -801,6 +800,25 @@ function renderStores(){
   });
 
   document.getElementById('store-count').textContent=`총 ${list.length}개 거래처`;
+  // 통계 바
+  const statsBar = document.getElementById('store-stats-bar');
+  if(statsBar){
+    const total = allStores.filter(s=>s.상태!=='비활성').length;
+    const sonCnt = allStores.filter(s=>s.담당==='손호영'&&s.상태!=='비활성').length;
+    const bakCnt = allStores.filter(s=>s.담당==='박기빈'&&s.상태!=='비활성').length;
+    const noneCnt = allStores.filter(s=>(!s.담당||s.담당==='')&&s.상태!=='비활성').length;
+    const inactiveCnt = allStores.filter(s=>s.상태==='비활성').length;
+    statsBar.innerHTML = [
+      {label:'전체',val:total,color:'var(--t2)'},
+      {label:'손호영',val:sonCnt,color:'#6c8fff'},
+      {label:'박기빈',val:bakCnt,color:'#3ddc84'},
+      {label:'미배정',val:noneCnt,color:'var(--y)'},
+      {label:'비활성',val:inactiveCnt,color:'var(--r)'},
+    ].map(s=>`<div style="flex:1;text-align:center;background:var(--card2);border-radius:8px;padding:7px 4px;cursor:pointer;" onclick="setStoreFilter('${s.label==='전체'?'전체':s.label}')">
+      <div style="font-size:16px;font-weight:900;color:${s.color};">${s.val}</div>
+      <div style="font-size:9px;color:var(--t3);margin-top:2px;">${s.label}</div>
+    </div>`).join('');
+  }
 
   const el=document.getElementById('store-list');
   if(!list.length){
@@ -1135,11 +1153,13 @@ function toggleCustom(){
 }
 
 // ===== 탭 이동 =====
-const TAB_IDS=['dashboard','history','stores','prices'];
+const TAB_IDS = ['dashboard','history','dispatch','stores','prices'];
 function goTab(t){
   document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',TAB_IDS[i]===t));
   document.querySelectorAll('.page').forEach((el,i)=>el.classList.toggle('on',`page-${TAB_IDS[i]}`===`page-${t}`));
   if(t==='dashboard') silentRefresh();
+  if(t==='dispatch') initDispatch();
+  if(t==='stores'){ renderStores(); }
   if(t==='history'){
     const hm=document.getElementById('hist-month');
     const dm=document.getElementById('dash-month').value;

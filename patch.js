@@ -1648,30 +1648,42 @@ function checkUrgentAssignments(){
         const _skip = JSON.parse(localStorage.getItem('skip_'+EMP+'_'+_t)||'[]');
         const _st = typeof stores!=='undefined' ? stores : [];
 
+        // 오늘 배차된 거래처 (긴급배정)
         const dispatched = _st.filter(s=>
           s.배정상태==='긴급배정' && s.배정날짜===_t &&
           (s.배정직원===EMP||s.담당===EMP) && s.상태!=='비활성'
         ).map(s=>s.이름);
 
+        // 상차한 거래처 (항상 포함)
+        const cargoNames = _cargos.filter(c=>c.거래처).map(c=>c.거래처);
+
+        // 내 담당 + 요일 있는 거래처 (오늘 요일만)
         const mine = _st.filter(s=>
-          s.상태!=='비활성' && s.담당===EMP && (!s.요일||s.요일===_day)
+          s.상태!=='비활성' && s.담당===EMP && s.요일 && s.요일===_day
         ).map(s=>s.이름);
 
+        // 미배정(공유) + 요일 있는 거래처
         const shared = _st.filter(s=>
           s.상태!=='비활성' &&
           (!s.담당||s.담당===''||s.담당==='공유') &&
-          (!s.요일||s.요일===_day)
+          s.요일 && s.요일===_day
         ).map(s=>s.이름);
 
+        // 타담당 + 요일 있는 거래처 (대리납품)
         const others = _st.filter(s=>
           s.상태!=='비활성' && s.담당 &&
           s.담당!==EMP && s.담당!=='공유' && s.요일===_day
         ).map(s=>s.이름);
 
-        const cargoNames = _cargos.filter(c=>c.거래처).map(c=>c.거래처);
-
-        const all = [...new Set([...dispatched,...cargoNames,...mine,...shared,...others])]
-          .filter(n=>!_skip.includes(n));
+        // 합치기: 배차 > 상차 > 요일담당 > 공유 > 타담당
+        // 요일 없는 거래처는 상차한 것만 (교촌 등 프랜차이즈)
+        const all = [...new Set([
+          ...dispatched,
+          ...cargoNames,
+          ...mine,
+          ...shared,
+          ...others,
+        ])].filter(n=>!_skip.includes(n));
 
         const ordered = [];
         if(typeof routeOrder!=='undefined'){
@@ -1680,12 +1692,12 @@ function checkUrgentAssignments(){
         all.forEach(n=>{ if(!ordered.includes(n)) ordered.push(n); });
         return ordered;
       }catch(e){
-        return _orig();
+        return typeof _orig==='function' ? _orig() : [];
       }
     };
   }
   setTimeout(_patch, 400);
-  document.addEventListener('DOMContentLoaded', ()=>setTimeout(_patch,200));
+  document.addEventListener('DOMContentLoaded', ()=>setTimeout(_patch, 200));
 })();
 
 

@@ -477,12 +477,17 @@ async function init(){
 
 async function loadAll(){
   showToast('📡 불러오는 중...');
+  if(typeof setBossSplash === 'function') setBossSplash('loading', '서버 연결 중...');
   try{
     await Promise.all([loadMonths(), loadPrices(), loadStores()]);
     await loadDashboard();
     updateAssignStats();
     showToast('✅ 완료!');
-  }catch(e){showToast('⚠️ 연결 실패');}
+    if(typeof setBossSplash === 'function') setBossSplash('success', '동기화 완료');
+  }catch(e){
+    showToast('⚠️ 연결 실패');
+    if(typeof setBossSplash === 'function') setBossSplash('offline', '오프라인 모드', '저장된 데이터로 시작합니다');
+  }
 }
 
 async function loadMonths(){
@@ -1814,27 +1819,7 @@ function setBossSplash(status,msg,sub){
     if(btn)btn.style.display='block';
   }
 }
-// loadAll 오버라이드 — DOMContentLoaded 후 안전하게
-(function patchBossLoadAll(){
-  function _patch(){
-    if(typeof loadAll !== 'function') return;
-    const _orig = loadAll;
-    window.loadAll = async function(){
-      setBossSplash('loading','서버 연결 중...');
-      try{
-        await _orig();
-        setBossSplash('success','동기화 완료');
-      }catch(e){
-        setBossSplash('offline','오프라인 모드','저장된 데이터로 시작합니다');
-      }
-    };
-  }
-  if(document.readyState === 'loading'){
-    document.addEventListener('DOMContentLoaded', ()=>setTimeout(_patch, 100));
-  } else {
-    setTimeout(_patch, 100);
-  }
-})();
+
 setTimeout(()=>{
   const btn=document.getElementById('bspl-btn');
   if(btn&&btn.style.display==='none'){

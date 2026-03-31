@@ -1,8 +1,111 @@
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // © 2025 제이제이컴퍼니 (JJ Company)
 // Oil Distribution Management System v3.0
-// All rights reserved. Unauthorized use prohibited.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// ══════════════ 즉시 스플래시 (patch.js 로드 즉시) ══════════════
+// son.html의 init()이 먼저 실행되므로
+// patch.js 로드되자마자 스플래시 표시 + init 결과 감시
+(function patchInitAndSplash(){
+  // 스플래시 즉시 생성
+  if(!document.getElementById('app-splash')){
+    const splash = document.createElement('div');
+    splash.id = 'app-splash';
+    splash.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0f1117;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:"Noto Sans KR",sans-serif;transition:opacity .4s ease;';
+    const empName = typeof EMP !== 'undefined' ? EMP : '직원';
+    splash.innerHTML = `
+      <div style="margin-bottom:32px;text-align:center;">
+        <div style="font-size:24px;font-weight:900;color:#e8eaf0;">제이제이컴퍼니</div>
+        <div style="font-size:12px;color:#7a7f94;margin-top:8px;">${empName}</div>
+      </div>
+      <div id="spl-icon" style="width:48px;height:48px;border:3px solid #2a2f3d;border-top-color:#6c8fff;border-radius:50%;animation:splspin .8s linear infinite;margin-bottom:18px;"></div>
+      <div id="spl-msg" style="font-size:14px;color:#7a7f94;font-weight:500;">서버 연결 중...</div>
+      <div id="spl-sub" style="font-size:11px;color:#3a3f52;margin-top:6px;min-height:16px;"></div>
+      <button id="spl-btn" onclick="window._dismissSplash()"
+        style="display:none;margin-top:24px;padding:12px 32px;background:transparent;border:1.5px solid #3a3f52;border-radius:10px;color:#7a7f94;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+        오프라인으로 시작
+      </button>
+      <style>@keyframes splspin{to{transform:rotate(360deg);}}@keyframes splcheck{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}</style>`;
+    document.body.appendChild(splash);
+  }
+
+  window._dismissSplash = function(){
+    const el = document.getElementById('app-splash');
+    if(!el) return;
+    el.style.opacity = '0';
+    setTimeout(()=>{ try{el.remove();}catch(e){} }, 400);
+  };
+
+  window._setSplash = function(status, msg, sub){
+    const icon  = document.getElementById('spl-icon');
+    const msgEl = document.getElementById('spl-msg');
+    const subEl = document.getElementById('spl-sub');
+    const btn   = document.getElementById('spl-btn');
+    if(msgEl) msgEl.textContent = msg || '';
+    if(subEl) subEl.textContent = sub || '';
+    if(status === 'success'){
+      if(icon){ icon.style.cssText='width:48px;height:48px;'; icon.innerHTML='<svg viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="24" r="21" fill="none" stroke="#3ddc84" stroke-width="3"/><path d="M14 24l7 7 13-13" fill="none" stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'; icon.style.animation='splcheck .35s ease'; }
+      if(msgEl){ msgEl.textContent='동기화 완료'; msgEl.style.color='#3ddc84'; }
+      if(btn) btn.style.display='none';
+      setTimeout(window._dismissSplash, 900);
+    } else if(status === 'offline' || status === 'error'){
+      if(icon){ icon.style.cssText='width:48px;height:48px;font-size:36px;text-align:center;line-height:48px;'; icon.textContent='📴'; }
+      if(msgEl){ msgEl.textContent= msg || '오프라인 모드'; msgEl.style.color='#ff9f43'; }
+      if(subEl) subEl.textContent = sub || '저장된 데이터로 시작합니다';
+      if(btn) btn.style.display='block';
+    }
+  };
+
+  // sync-status 요소 변화 감시 → init() 결과 감지
+  // son.html의 init()은 성공 시 sync-status를 '✅'로, 실패 시 '📴'로 변경
+  let _watched = false;
+  function watchSyncStatus(){
+    if(_watched) return;
+    const el = document.getElementById('sync-status');
+    if(!el){ setTimeout(watchSyncStatus, 100); return; }
+    _watched = true;
+
+    // 이미 완료됐으면 즉시 처리
+    if(el.textContent === '✅'){
+      window._setSplash('success', '동기화 완료');
+      return;
+    }
+    if(el.textContent === '📴'){
+      window._setSplash('offline', '오프라인 모드', '저장된 데이터로 시작합니다');
+      return;
+    }
+
+    // 아직 진행 중이면 MutationObserver로 감시
+    const observer = new MutationObserver(()=>{
+      const txt = el.textContent;
+      if(txt === '✅'){
+        window._setSplash('success', '동기화 완료');
+        observer.disconnect();
+      } else if(txt === '📴'){
+        window._setSplash('offline', '오프라인 모드', '저장된 데이터로 시작합니다');
+        observer.disconnect();
+      }
+    });
+    observer.observe(el, {childList:true, characterData:true, subtree:true});
+
+    // 12초 후에도 변화 없으면 오프라인 버튼 표시
+    setTimeout(()=>{
+      const btn = document.getElementById('spl-btn');
+      const sub = document.getElementById('spl-sub');
+      if(btn && btn.style.display === 'none'){
+        btn.style.display = 'block';
+        if(sub) sub.textContent = '연결이 오래 걸리고 있어요';
+      }
+    }, 12000);
+  }
+
+  // DOM 준비되면 감시 시작
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', watchSyncStatus);
+  } else {
+    watchSyncStatus();
+  }
+})();
 
 // patch.js v2 - son.html / bak.html 패치
 // son.html / bak.html 의 </body> 바로 앞에
@@ -1592,92 +1695,4 @@ function checkUrgentAssignments(){
   document.addEventListener('DOMContentLoaded', ()=>setTimeout(_patch,200));
 })();
 
-// ══════════════ 앱 시작 스플래시 + 동기화 UI ══════════════
-(function initAppSplash(){
-  if(document.getElementById('app-splash')) return;
 
-  const splash = document.createElement('div');
-  splash.id = 'app-splash';
-  splash.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#0f1117;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:"Noto Sans KR",sans-serif;transition:opacity .4s ease;';
-  
-  const empName = typeof EMP !== 'undefined' ? EMP : '직원';
-  
-  splash.innerHTML = `
-    <div style="margin-bottom:32px;text-align:center;">
-      <div style="font-size:24px;font-weight:900;color:#e8eaf0;letter-spacing:-.5px;">제이제이컴퍼니</div>
-      <div style="font-size:12px;color:#7a7f94;margin-top:8px;">${empName}</div>
-    </div>
-    <div id="spl-icon" style="width:48px;height:48px;border:3px solid #2a2f3d;border-top-color:#6c8fff;border-radius:50%;animation:splspin .8s linear infinite;margin-bottom:18px;"></div>
-    <div id="spl-msg" style="font-size:14px;color:#7a7f94;font-weight:500;">서버 연결 중...</div>
-    <div id="spl-sub" style="font-size:11px;color:#3a3f52;margin-top:6px;min-height:16px;"></div>
-    <button id="spl-btn" onclick="window._dismissSplash()"
-      style="display:none;margin-top:24px;padding:12px 32px;background:transparent;border:1.5px solid #3a3f52;border-radius:10px;color:#7a7f94;font-size:13px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
-      오프라인으로 시작
-    </button>
-    <style>
-      @keyframes splspin{to{transform:rotate(360deg);}}
-      @keyframes splcheck{0%{transform:scale(.4);opacity:0}60%{transform:scale(1.15)}100%{transform:scale(1);opacity:1}}
-    </style>`;
-  
-  document.body.appendChild(splash);
-
-  window._dismissSplash = function(){
-    const el = document.getElementById('app-splash');
-    if(!el) return;
-    el.style.opacity = '0';
-    setTimeout(()=>{ el.remove(); }, 400);
-  };
-
-  window._setSplash = function(status, msg, sub){
-    const icon = document.getElementById('spl-icon');
-    const msgEl = document.getElementById('spl-msg');
-    const subEl = document.getElementById('spl-sub');
-    const btn   = document.getElementById('spl-btn');
-    if(msgEl) msgEl.textContent = msg || '';
-    if(subEl) subEl.textContent = sub || '';
-    if(status === 'success'){
-      if(icon){ icon.style.cssText='width:48px;height:48px;'; icon.innerHTML='<svg viewBox="0 0 48 48" width="48" height="48"><circle cx="24" cy="24" r="21" fill="none" stroke="#3ddc84" stroke-width="3"/><path d="M14 24l7 7 13-13" fill="none" stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>'; icon.style.animation='splcheck .35s ease'; }
-      if(msgEl){ msgEl.style.color='#3ddc84'; }
-      if(btn) btn.style.display='none';
-      setTimeout(window._dismissSplash, 900);
-    } else if(status === 'offline'){
-      if(icon){ icon.style.cssText='width:48px;height:48px;font-size:36px;text-align:center;line-height:48px;'; icon.textContent='📴'; }
-      if(msgEl){ msgEl.textContent='오프라인 모드'; msgEl.style.color='#ff9f43'; }
-      if(subEl) subEl.textContent = sub || '저장된 데이터로 시작합니다';
-      if(btn) btn.style.display='block';
-    } else if(status === 'error'){
-      if(icon){ icon.style.cssText='width:48px;height:48px;font-size:36px;text-align:center;line-height:48px;'; icon.textContent='⚠️'; }
-      if(msgEl){ msgEl.style.color='#ff6b6b'; }
-      if(btn) btn.style.display='block';
-    }
-  };
-
-  // 10초 후 자동으로 오프라인 버튼 표시
-  setTimeout(()=>{
-    const btn = document.getElementById('spl-btn');
-    if(btn && btn.style.display==='none'){
-      btn.style.display='block';
-      const sub = document.getElementById('spl-sub');
-      if(sub) sub.textContent='연결이 오래 걸리고 있어요';
-    }
-  }, 10000);
-})();
-
-// ── init 오버라이드 — 스플래시 연동 ──
-const _origInitSplash = typeof init === 'function' ? init : null;
-
-async function init(){
-  if(typeof window._setSplash === 'function') window._setSplash('loading', '서버 연결 중...');
-  try{
-    if(_origInitSplash) await _origInitSplash();
-    if(typeof window._setSplash === 'function') window._setSplash('success', '동기화 완료');
-  }catch(e){
-    const offline = !navigator.onLine || (e.message||'').includes('timed out') || (e.message||'').includes('fetch');
-    if(typeof window._setSplash === 'function'){
-      window._setSplash(offline ? 'offline' : 'error', offline ? '오프라인 모드' : '연결 실패', (e.message||'').slice(0,50));
-    }
-    // 에러여도 로컬 데이터로 계속 실행
-    try{ if(typeof renderRoute==='function') renderRoute(); }catch(e2){}
-    try{ if(typeof renderPriceTab==='function') renderPriceTab(); }catch(e2){}
-  }
-}

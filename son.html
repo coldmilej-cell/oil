@@ -145,7 +145,7 @@ select option{background:#181c24;}
   <div class="tab"     onclick="goTab('delivery')">📦 납품</div>
   <div class="tab"     onclick="goTab('payment')">💳 입금</div>
   <div class="tab"     onclick="goTab('history')">📋 내역</div>
-  <div class="tab"     onclick="goTab('prices')">💰 단가</div>
+  <div class="tab"     onclick="goTab('prices');setTimeout(()=>{if(typeof renderPriceTab==='function')renderPriceTab();},50)">💰 단가</div>
 </div>
 
 <!-- 출근 -->
@@ -519,10 +519,13 @@ select option{background:#181c24;}
     </div>
   </div>
   <!-- 월 선택 + 거래처 검색 -->
-  <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
+  <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;">
     <input type="month" id="hist-month-sel"
-      style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
+      style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:9px 10px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
       onchange="onHistMonthChange()">
+    <input type="date" id="hist-date-sel"
+      style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:9px 10px;color:var(--t);font-size:12px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
+      onchange="onHistDateChange()">
   </div>
   <!-- 거래처 검색 -->
   <div style="position:relative;margin-bottom:10px;">
@@ -2434,6 +2437,8 @@ function markSent(txId){ const m=getSentMap(); m[txId]=new Date().toISOString();
 function isSent(txId){ return !!getSentMap()[txId]; }
 
 function onHistMonthChange(){
+  const d=document.getElementById('hist-date-sel');
+  if(d) d.value='';
   renderHistory();
 }
 function onHistDateChange(){
@@ -2470,6 +2475,8 @@ async function renderHistory(){
   }
 
   // 거래처 검색 필터
+  const _filterDate = (document.getElementById('hist-date-sel')?.value||'').trim();
+  if(_filterDate) list = list.filter(t => String(t.날짜||'').slice(0,10) === _filterDate);
   const histStoreQ = (document.getElementById('hist-store-search')?.value||'').trim();
   if(histStoreQ) list = list.filter(t => (t.거래처||'').includes(histStoreQ));
 

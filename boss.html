@@ -211,6 +211,25 @@ select option{background:#161b22;}
 
   <!-- 월마감 -->
   <div class="divider"></div>
+  <!-- 실적 트렌드 차트 -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+    <div class="sec-label" style="margin:0;">📈 실적 트렌드</div>
+    <div style="display:flex;gap:4px;">
+      <div id="trend-tab-daily" onclick="setTrendTab('daily')"
+        style="padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--p2);color:#fff;">일별</div>
+      <div id="trend-tab-emp" onclick="setTrendTab('emp')"
+        style="padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--t2);">직원별</div>
+      <div id="trend-tab-monthly" onclick="setTrendTab('monthly')"
+        style="padding:4px 10px;border-radius:6px;font-size:10px;font-weight:700;cursor:pointer;background:var(--card2);color:var(--t2);">월별</div>
+    </div>
+  </div>
+  <div id="trend-chart-wrap" style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;">
+    <canvas id="trend-chart" style="width:100%;height:160px;display:block;"></canvas>
+    <div id="trend-legend" style="display:flex;gap:10px;margin-top:10px;flex-wrap:wrap;justify-content:center;"></div>
+    <div id="trend-empty" style="text-align:center;padding:30px;color:var(--t3);font-size:13px;display:none;">데이터 없음</div>
+  </div>
+
+  <div class="divider"></div>
   <div class="sec-label">📅 월마감</div>
   <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px;margin-bottom:10px">
     <div style="font-size:12px;color:var(--t2);margin-bottom:10px">
@@ -301,6 +320,12 @@ select option{background:#161b22;}
     </button>
   </div>
 
+  <!-- 거래처 검색 -->
+  <div style="position:relative;margin-bottom:8px;">
+    <input type="text" id="boss-hist-store-q" placeholder="🔍 거래처명 검색..."
+      style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:9px 13px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+      oninput="renderHistoryByTab()">
+  </div>
   <!-- 요약 바 -->
   <div id="hist-summary" style="background:var(--card2);border-radius:10px;padding:10px 12px;margin-bottom:10px;display:none;"></div>
 
@@ -541,8 +566,12 @@ select option{background:#161b22;}
   <div class="page-title">💰 단가 관리</div>
   <!-- ★ 수정 5: hint 텍스트 -->
   <div class="hint">단가는 추가만 가능 → 과거 거래 마진 자동 보호 · 폐유단가는 오늘것만 수정 가능</div>
-  <div class="sec-label">폐유 회사매입단가</div>
-  <div class="info-box" style="margin-bottom:8px" id="waste-cur-box">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+    <div class="sec-label" style="margin:0">폐유 회사매입단가</div>
+    <span id="waste-hist-toggle" onclick="toggleWasteHist()" 
+      style="font-size:11px;color:var(--p);cursor:pointer;">이력보기 ▼</span>
+  </div>
+  <div class="info-box" style="margin-bottom:4px" id="waste-cur-box">
     <div class="info-row">
       <div>
         <div style="font-size:10px;color:var(--t3);margin-bottom:2px">현재 단가</div>
@@ -624,6 +653,7 @@ select option{background:#161b22;}
       <div class="inp-wrap"><label>입금자명</label><input class="inp" id="sm-payer" placeholder="홍길동"></div>
     </div>
     <div class="inp-wrap"><label>비고</label><input class="inp" id="sm-note" placeholder="특이사항"></div>
+    <div class="inp-wrap"><label>미수한도 (원, 0=한도없음)</label><input class="inp" type="number" id="sm-limit" placeholder="0" inputmode="numeric" step="10000"></div>
     <div style="display:flex;gap:8px;margin-top:4px" id="store-modal-btns">
       <button onclick="closeStoreModal()" style="flex:1;padding:13px;background:var(--card2);border:1.5px solid var(--border);border-radius:11px;color:var(--t2);font-size:14px;font-weight:600;cursor:pointer;font-family:'Noto Sans KR',sans-serif">취소</button>
       <button onclick="saveStore()" style="flex:2;padding:13px;background:var(--y2);border:none;border-radius:11px;color:#000;font-size:14px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif" id="store-save-btn">저장</button>
@@ -658,7 +688,7 @@ select option{background:#161b22;}
 const API = 'https://script.google.com/macros/s/AKfycbxeQjdoPOaetW_jV5PlycwG2xLaVBIKcJ1ryYtZ73KZOm3evFOpx6JjrpNkTZLzceuk/exec';
 const DAYS=['일','월','화','수','목','금','토'];
 
-let allTx=[], allPayments=[], allWaste=[], allPrices=[], allStores=[];
+let allTx=[], allPayments=[], allWaste=[], allPrices=[], allStores=[], allClosing=[];
 let misuMap={};
 let storeFilter='전체';
 let editingStoreCode=null;
@@ -1018,6 +1048,18 @@ function setStoreFilter(f){
 }
 
 function renderStores(){
+  // 거래처별 방문이력 계산
+  const visitMap = {};
+  const now = new Date();
+  const thisMonth = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  allTx.forEach(t => {
+    const store = t.거래처;
+    if(!store) return;
+    if(!visitMap[store]) visitMap[store] = {last:'', count:0, thisMonth:0};
+    if(!visitMap[store].last || t.날짜 > visitMap[store].last) visitMap[store].last = t.날짜;
+    visitMap[store].count++;
+    if(String(t.날짜||'').startsWith(thisMonth)) visitMap[store].thisMonth++;
+  });
   const q=(document.getElementById('store-search').value||'').trim();
   let list=[...allStores];
 
@@ -1083,6 +1125,11 @@ function renderStores(){
         <div style="flex:1">
           <div class="store-name">${s.이름||''}</div>
           <div class="store-meta">${s.연락처||''} ${s.입금자?'· 입금자: '+s.입금자:''}</div>
+          <div style="font-size:9px;color:var(--t3);margin-top:2px;">
+            ${visitMap[s.이름]?.last
+              ? `📅 ${visitMap[s.이름].last.slice(5)} 방문 · 이달 ${visitMap[s.이름].thisMonth||0}회`
+              : '방문이력 없음'}
+          </div>
           <div class="store-badges">
             <span class="store-badge ${empCls}">${empLabel}</span>
             ${s.요일?`<span class="store-badge day">${s.요일}</span>`:''}
@@ -1114,6 +1161,7 @@ function openStoreAdd(){
   document.getElementById('sm-tel').value='';
   document.getElementById('sm-payer').value='';
   document.getElementById('sm-note').value='';
+  document.getElementById('sm-limit').value=0;
   document.getElementById('store-save-btn').textContent='추가';
   document.getElementById('store-modal').style.display='flex';
   setTimeout(()=>document.getElementById('sm-name').focus(),100);
@@ -1131,6 +1179,7 @@ function openStoreEdit(code){
   document.getElementById('sm-tel').value=s.연락처||'';
   document.getElementById('sm-payer').value=s.입금자||'';
   document.getElementById('sm-note').value=s.비고||'';
+  document.getElementById('sm-limit').value=s.미수한도||0;
   document.getElementById('store-save-btn').textContent='수정 저장';
   document.getElementById('store-modal').style.display='flex';
 }
@@ -1152,6 +1201,7 @@ async function saveStore(){
     연락처:document.getElementById('sm-tel').value.trim(),
     입금자:document.getElementById('sm-payer').value.trim(),
     비고:document.getElementById('sm-note').value.trim(),
+    미수한도:+document.getElementById('sm-limit')?.value||0,
   };
 
   try{
@@ -1243,8 +1293,10 @@ function updateHistSummary(){
 
 function renderHistory(){
   const emp=document.getElementById('hist-emp')?.value||'';
+  const storeQ=(document.getElementById('boss-hist-store-q')?.value||'').trim();
   let list=allTx;
-  if(emp)list=list.filter(t=>t.직원===emp);
+  if(emp) list=list.filter(t=>t.직원===emp);
+  if(storeQ) list=list.filter(t=>(t.거래처||'').includes(storeQ));
   list=list.sort((a,b)=>b.id-a.id);
   const el=document.getElementById('history-list');
   if(!el) return;
@@ -1307,8 +1359,10 @@ function renderWasteHistory(){
 
 function renderPaymentHistory(){
   const emp=document.getElementById('hist-emp')?.value||'';
+  const storeQ=(document.getElementById('boss-hist-store-q')?.value||'').trim();
   let list=histPayments;
   if(emp) list=list.filter(p=>(p.직원||'')=== emp);
+  if(storeQ) list=list.filter(p=>(p.거래처||'').includes(storeQ));
   const el=document.getElementById('history-list');
   if(!el) return;
   if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">💳</div><div style="font-size:13px">입금 내역 없음</div></div>';return;}
@@ -1336,14 +1390,17 @@ function renderPaymentHistory(){
   }).join('');
 }
 
-async function deleteTx(id){
-  if(!confirm('삭제할까요?'))return;
+async async function deleteTx(id){
+  if(!confirm('삭제할까요?')) return;
+  if(!confirm('정말 삭제할까요? 되돌릴 수 없어요.')) return;
   const month=document.getElementById('hist-month')?.value||document.getElementById('dash-month').value;
   const [y,m]=month.split('-');
-  await fetch(API,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},
-    body:JSON.stringify({type:'delete_tx',id,year:+y,month:+m})});
-  showToast('삭제됐어요');
-  await loadHistoryAll();
+  try{
+    await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({type:'delete_tx',id,year:+y,month:+m,boss:true})});
+    showToast('삭제됐어요');
+    await loadHistoryAll();
+  }catch(e){ showToast('⚠️ 삭제 실패'); }
 }
 
 // ===== 단가 =====
@@ -2271,6 +2328,15 @@ async function addDispatch(){
     const b = document.getElementById(id);
     if(b){ b.style.borderColor='var(--border)'; b.style.background='var(--card2)'; b.style.color='var(--t2)'; }
   });
+  // 폼 초기화
+  const _sq=document.getElementById('dispatch-store-q');
+  if(_sq){_sq.value='';_sq.dispatchEvent(new Event('input'));}
+  document.getElementById('dispatch-emp').value='';
+  document.getElementById('dispatch-info-panel').style.display='none';
+  ['손호영','박기빈'].forEach(n=>{
+    const b=document.getElementById('dbtn-'+n);
+    if(b){b.style.borderColor='var(--border)';b.style.background='var(--card2)';b.style.color='var(--t2)';}
+  });
   renderDispatchList();
 }
 
@@ -2467,6 +2533,199 @@ async function toggleStoreActive(코드, 상태){
     showToast('⚠️ 서버 저장 실패 - 로컬에만 반영');
   }
   renderStores();
+}
+
+// ══ 폐유단가 이력 (boss 단가탭) ══
+function toggleWasteHist(){
+  const el = document.getElementById('waste-hist-list');
+  const btn = document.getElementById('waste-hist-toggle');
+  if(!el) return;
+  const open = el.style.display === 'none';
+  el.style.display = open ? 'block' : 'none';
+  if(btn) btn.textContent = open ? '이력접기 ▲' : '이력보기 ▼';
+  if(open) renderWasteHistBoss();
+}
+
+function renderWasteHistBoss(){
+  const el = document.getElementById('waste-hist-list');
+  if(!el) return;
+  // boss에서 priceHistory 기반으로 폐유단가 이력 표시
+  const hist = (typeof allPrices !== 'undefined' ? allPrices : [])
+    .filter(p => p.품명 === '폐유매입단가')
+    .sort((a,b) => b.적용일자 > a.적용일자 ? 1 : -1);
+  if(!hist.length){
+    el.innerHTML = '<div style="font-size:12px;color:var(--t3);padding:8px">이력 없음</div>';
+    return;
+  }
+  el.innerHTML = hist.map((p,i) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:var(--card2);border-radius:8px;margin-bottom:5px;">
+      <div>
+        <span style="font-size:11px;color:var(--t3);">${p.적용일자}</span>
+        ${i===0?'<span style="font-size:9px;background:rgba(108,143,255,.15);color:var(--p);border-radius:4px;padding:1px 5px;margin-left:5px;">현재</span>':''}
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;">${(+p.출고가||0).toLocaleString()}원/kg</span>
+    </div>
+  `).join('');
+}
+
+// ══════════════════════════════════════
+// 실적 트렌드 차트
+// ══════════════════════════════════════
+let _trendTab = 'daily';
+
+function setTrendTab(tab){
+  _trendTab = tab;
+  ['daily','emp','monthly'].forEach(t => {
+    const el = document.getElementById(`trend-tab-${t}`);
+    if(!el) return;
+    if(t === tab){
+      el.style.background = 'var(--p2)'; el.style.color = '#fff';
+    } else {
+      el.style.background = 'var(--card2)'; el.style.color = 'var(--t2)';
+    }
+  });
+  renderTrendChart();
+}
+
+function renderTrendChart(){
+  const canvas = document.getElementById('trend-chart');
+  const empty = document.getElementById('trend-empty');
+  const legend = document.getElementById('trend-legend');
+  if(!canvas) return;
+
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 320;
+  const H = 160;
+  canvas.width = W * (window.devicePixelRatio||1);
+  canvas.height = H * (window.devicePixelRatio||1);
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(window.devicePixelRatio||1, window.devicePixelRatio||1);
+
+  let datasets = [];
+
+  if(_trendTab === 'daily'){
+    // 이달 일별 수익
+    const byDate = {};
+    allTx.forEach(t => {
+      const d = String(t.날짜||'').slice(8,10);
+      if(!d) return;
+      byDate[d] = (byDate[d]||0) + (+t.총수익||0);
+    });
+    const labels = Object.keys(byDate).sort();
+    if(!labels.length){ empty.style.display='block'; canvas.style.display='none'; return; }
+    empty.style.display='none'; canvas.style.display='block';
+    datasets = [{ label:'일별 수익', data: labels.map(d=>byDate[d]), color:'#6c8fff', labels }];
+
+  } else if(_trendTab === 'emp'){
+    // 직원별 이달 수익
+    const son = {}, bak = {};
+    allTx.forEach(t => {
+      const d = String(t.날짜||'').slice(8,10);
+      if(!d) return;
+      if(t.직원==='손호영') son[d] = (son[d]||0) + (+t.총수익||0);
+      else if(t.직원==='박기빈') bak[d] = (bak[d]||0) + (+t.총수익||0);
+    });
+    const allDates = [...new Set([...Object.keys(son),...Object.keys(bak)])].sort();
+    if(!allDates.length){ empty.style.display='block'; canvas.style.display='none'; return; }
+    empty.style.display='none'; canvas.style.display='block';
+    datasets = [
+      { label:'손호영', data: allDates.map(d=>son[d]||0), color:'#6c8fff', labels: allDates },
+      { label:'박기빈', data: allDates.map(d=>bak[d]||0), color:'#3ddc84', labels: allDates },
+    ];
+
+  } else {
+    // 월별 (월마감 이력)
+    const closing = allClosing||[];
+    const months = [...new Set(closing.map(r=>String(r.월||'')))].sort().slice(-6);
+    if(!months.length){ empty.style.display='block'; canvas.style.display='none'; return; }
+    empty.style.display='none'; canvas.style.display='block';
+    const son = months.map(m => {
+      const r = closing.find(x=>String(x.월)===m&&x.직원==='손호영');
+      return +(r?.총수익||0);
+    });
+    const bak = months.map(m => {
+      const r = closing.find(x=>String(x.월)===m&&x.직원==='박기빈');
+      return +(r?.총수익||0);
+    });
+    datasets = [
+      { label:'손호영', data: son, color:'#6c8fff', labels: months },
+      { label:'박기빈', data: bak, color:'#3ddc84', labels: months },
+    ];
+  }
+
+  // 실제 그리기
+  _drawBarChart(ctx, W, H, datasets);
+
+  // 범례
+  if(legend){
+    legend.innerHTML = datasets.map(d =>
+      `<div style="display:flex;align-items:center;gap:4px;font-size:10px;color:var(--t2);">
+        <div style="width:10px;height:10px;border-radius:2px;background:${d.color};"></div>${d.label}
+      </div>`
+    ).join('');
+  }
+}
+
+function _drawBarChart(ctx, W, H, datasets){
+  const labels = datasets[0].labels;
+  const n = labels.length;
+  const padL=8, padR=8, padT=20, padB=28;
+  const chartW = W - padL - padR;
+  const chartH = H - padT - padB;
+
+  // 최대값
+  const allVals = datasets.flatMap(d=>d.data);
+  const maxVal = Math.max(...allVals, 1);
+
+  // 배경
+  ctx.clearRect(0,0,W,H);
+
+  // Y 그리드 (3줄)
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 1;
+  [0.25,0.5,0.75,1].forEach(r => {
+    const y = padT + chartH * (1-r);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W-padR, y); ctx.stroke();
+    // Y 라벨
+    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.font = '8px JetBrains Mono, monospace';
+    ctx.textAlign = 'left';
+    const v = maxVal * r;
+    ctx.fillText(v>=10000 ? Math.round(v/10000)+'만' : Math.round(v)+'', padL, y-2);
+  });
+
+  const groupW = chartW / n;
+  const barW = Math.max(4, groupW / (datasets.length+1) - 2);
+
+  datasets.forEach((ds, di) => {
+    ctx.fillStyle = ds.color;
+    ds.data.forEach((val, i) => {
+      const barH = (val/maxVal) * chartH;
+      const x = padL + i*groupW + (di * (barW+2)) + 4;
+      const y = padT + chartH - barH;
+      // 둥근 모서리
+      const r = Math.min(3, barW/2);
+      ctx.beginPath();
+      ctx.moveTo(x+r, y);
+      ctx.lineTo(x+barW-r, y);
+      ctx.quadraticCurveTo(x+barW, y, x+barW, y+r);
+      ctx.lineTo(x+barW, y+barH);
+      ctx.lineTo(x, y+barH);
+      ctx.lineTo(x, y+r);
+      ctx.quadraticCurveTo(x, y, x+r, y);
+      ctx.fill();
+    });
+  });
+
+  // X 라벨
+  ctx.fillStyle = 'rgba(255,255,255,0.4)';
+  ctx.font = '8px Noto Sans KR, sans-serif';
+  ctx.textAlign = 'center';
+  labels.forEach((l, i) => {
+    const x = padL + i*groupW + groupW/2;
+    ctx.fillText(l, x, H-6);
+  });
 }
 </script>
 

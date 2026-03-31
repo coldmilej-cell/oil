@@ -253,6 +253,18 @@ select option{background:#181c24;}
     <button class="btn-add" style="margin-top:4px;margin-bottom:60px" onclick="showDeliveryForm(null)">+ 신규 / 추가 납품</button>
   </div>
 
+  <!-- 루트에 없는 거래처 추가 -->
+  <div style="padding:0 16px;margin-bottom:8px;">
+    <div style="display:flex;gap:8px;align-items:center;">
+      <input type="text" id="extra-store-q" placeholder="거래처 직접 추가..."
+        style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+        oninput="onExtraStoreSearch()" onfocus="onExtraStoreSearch()"
+        onblur="setTimeout(()=>{const d=document.getElementById('extra-store-dd');if(d)d.style.display='none';},150)"
+        autocomplete="off">
+      <div id="extra-store-dd" style="position:absolute;background:var(--card);border:1.5px solid var(--border);border-radius:10px;z-index:100;max-height:180px;overflow-y:auto;display:none;min-width:200px;margin-top:40px;"></div>
+    </div>
+  </div>
+
   <!-- 납품탭 하단 고정 현황바 -->
   <div id="daily-bar" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;background:var(--card);border-top:1px solid var(--border);padding:10px 16px;z-index:50;display:none">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
@@ -506,14 +518,17 @@ select option{background:#181c24;}
       <div style="font-size:11px;color:var(--t3)" id="hist-month-label"></div>
     </div>
   </div>
-  <!-- 날짜 선택 -->
-  <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px">
+  <!-- 월 선택 + 거래처 검색 -->
+  <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;">
     <input type="month" id="hist-month-sel"
       style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
       onchange="onHistMonthChange()">
-    <input type="date" id="hist-date-sel"
-      style="flex:1;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;appearance:none;"
-      onchange="onHistDateChange()">
+  </div>
+  <!-- 거래처 검색 -->
+  <div style="position:relative;margin-bottom:10px;">
+    <input type="text" id="hist-store-search" placeholder="🔍 거래처명 검색..."
+      style="width:100%;background:var(--card2);border:1.5px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--t);font-size:13px;font-family:'Noto Sans KR',sans-serif;outline:none;"
+      oninput="renderHistory()">
   </div>
   <!-- 명세서 일괄 발송 버튼 -->
   <div id="batch-receipt-wrap" style="display:block;margin-bottom:10px">
@@ -804,6 +819,7 @@ async function init(){
     try{
       const cr=await fetch(API+'?type=config',fetchOpts);
       cd=await cr.json();
+      window._appConfig = cd.config || {}; // 계좌정보 등 전역 접근
     }catch(e){}
     if(sd.stores?.length){
       stores=sd.stores.map(s=>({코드:s.코드||'',이름:s.이름||'',담당:s.담당||'',요일:s.요일||'',유종:s.유종||'',연락처:s.연락처||'',입금자:s.입금자||'',계좌:s.계좌||'',비고:s.비고||''}));
@@ -827,6 +843,10 @@ async function init(){
       localStorage.setItem('wastePriceHistory_v3',JSON.stringify(wastePriceHistory));
     }
     document.getElementById('sync-status').textContent='✅';
+    if(!stores.length){
+      document.getElementById('sync-status').textContent='⚠️ 거래처 없음';
+      showToast('⚠️ 거래처 정보가 없어요. 사장님께 확인해주세요.');
+    }
     (function(){
       const _wd=localStorage.getItem(`workDate_${EMP}`);
       const _wb=document.getElementById('workdate-badge');
@@ -1180,6 +1200,11 @@ function calcStockSummary(){
 }
 
 async function saveCheckin(){
+  // 이미 출근한 날이면 차단
+  const _existWd = workDate();
+  if(_existWd && _existWd === today()){
+    if(!confirm('오늘 이미 출근 처리됐어요.\n다시 저장하면 상차 정보가 덮어씌워져요. 계속할까요?')) return;
+  }
   setWorkDate(today());
   const validPallets=pallets.filter(p=>p.총중량>0&&p.캔수>0);
   const validCargos=cargos.filter(c=>c.통수>0);
@@ -1292,13 +1317,13 @@ function getRouteList(){
   // 담당+요일 둘다 있으면 둘다 필터, 담당만 있으면 담당만, 둘다 없으면 전체
   const myStores=hasAssign
     ? (hasDay
-        ? stores.filter(s=>s.담당===EMP&&(!s.요일||s.요일===today_day))
-        : stores.filter(s=>s.담당===EMP))
+        ? stores.filter(s=>s.담당===EMP&&(!s.요일||s.요일===today_day)&&s.상태!=='비활성')
+        : stores.filter(s=>s.담당===EMP&&s.상태!=='비활성'))
     : (hasDay
-        ? stores.filter(s=>s.요일===today_day)
-        : stores);
+        ? stores.filter(s=>s.요일===today_day&&s.상태!=='비활성')
+        : stores.filter(s=>s.상태!=='비활성'));
   const names=[...new Set([
-    ...savedCargos.filter(c=>c.거래처).map(c=>c.거래처), // 상차한 거래처 (교차납품 포함)
+    ...savedCargos.filter(c=>c.거래처&&stores.find(s=>s.이름===c.거래처)?.상태!=='비활성').map(c=>c.거래처), // 상차한 거래처 (교차납품 포함, 비활성 제외)
     ...myStores.map(s=>s.이름)
   ])].filter(n=>!skipped.includes(n));
   const ordered=[];
@@ -2409,8 +2434,6 @@ function markSent(txId){ const m=getSentMap(); m[txId]=new Date().toISOString();
 function isSent(txId){ return !!getSentMap()[txId]; }
 
 function onHistMonthChange(){
-  // 월 선택 시 일 선택 초기화
-  document.getElementById('hist-date-sel').value='';
   renderHistory();
 }
 function onHistDateChange(){
@@ -2427,10 +2450,8 @@ async function renderHistory(){
   const now=new Date();
   const defaultMonth=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
   const selEl=document.getElementById('hist-month-sel');
-  const dateEl=document.getElementById('hist-date-sel');
   if(selEl&&!selEl.value) selEl.value=defaultMonth;
   const month=selEl?.value||defaultMonth;
-  const filterDate=dateEl?.value||''; // 특정 날짜 필터
   const [yy,mm]=month.split('-');
   const el=document.getElementById('history-list');
   el.innerHTML='<div style="text-align:center;padding:30px;color:var(--t3)">⏳ 불러오는 중...</div>';
@@ -2448,8 +2469,9 @@ async function renderHistory(){
     }catch(e){}
   }
 
-  // 날짜 필터
-  if(filterDate) list=list.filter(t=>t.날짜===filterDate);
+  // 거래처 검색 필터
+  const histStoreQ = (document.getElementById('hist-store-search')?.value||'').trim();
+  if(histStoreQ) list = list.filter(t => (t.거래처||'').includes(histStoreQ));
 
   if(!list.length){el.innerHTML='<div class="empty"><div class="empty-icon">📝</div><div>내역 없음</div></div>';
     document.getElementById('batch-receipt-wrap').style.display='none'; return;}

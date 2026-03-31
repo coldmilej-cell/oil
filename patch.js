@@ -264,6 +264,27 @@ function buildReceipt(tx){
   if(tx.수금방법==='현금')lines.push(`💵 현금수령: ${(+tx.수금액||0).toLocaleString()}원`);
   else if(tx.수금방법==='미수'||tx.미수)lines.push(misu>0?`📌 누적 미수: ${misu.toLocaleString()}원`:'📌 미수 처리');
   if(tx.비고)lines.push(`\n📝 ${tx.비고}`);
+  // 계좌정보 추가 (GAS config 또는 로컬 캐시)
+  try{
+    const _cfg = window._appConfig || {};
+    const accs = [];
+    let i = 1;
+    while(_cfg[`account_${i}`]){
+      try{ accs.push(JSON.parse(_cfg[`account_${i}`])); }catch(e){}
+      i++;
+    }
+    if(accs.length>0){
+      lines.push('');
+      lines.push('─────────────────');
+      lines.push('💳 입금계좌');
+      accs.forEach(a=>{
+        const bank = a.bank||a.은행||'';
+        const num = a.number||a.계좌번호||'';
+        const owner = a.name||a.예금주||'';
+        if(bank&&num) lines.push(`${bank} ${num}${owner?` (${owner})`:''}`);
+      });
+    }
+  }catch(e){}
   return lines.join('\n');
 }
 
@@ -1232,6 +1253,16 @@ async function saveInlineDelivery(name, idx){
 
   if(!completedRoutes.includes(name)) completedRoutes.push(name);
   localStorage.setItem(`done_${EMP}_${t}`, JSON.stringify(completedRoutes));
+  // misuMap 로컬 업데이트 (미수 납품 시)
+  if(typeof misuMap !== 'undefined' && misuMap !== null){
+    if(!misuMap) window.misuMap = {};
+    const _charge = +tx.차감청구 || 0;
+    const _pay = tx.수금방법 === '현금' || tx.수금방법 === '이체지급' ? _charge : 0;
+    const _isMisu = tx.미수 === true || tx.수금방법 === '미수' || tx.수금방법 === '미수차감';
+    if(_isMisu) misuMap[storeName] = Math.max(0, (misuMap[storeName]||0) + _charge);
+    else if(_pay > 0) misuMap[storeName] = Math.max(0, (misuMap[storeName]||0) - _pay);
+  }
+
   // 완료 애니메이션
   const _aidx = (typeof getRouteList==='function') ? getRouteList().indexOf(name) : -1;
   if(_aidx >= 0) setTimeout(()=>{ if(typeof playDoneAnimation==='function') playDoneAnimation(_aidx); }, 80);
@@ -1555,4 +1586,49 @@ function playDoneAnimation(idx){
     s.textContent='@keyframes donePop{0%{transform:scale(.3)}60%{transform:scale(1.3)}100%{transform:scale(1)}}';
     document.head.appendChild(s);
   }
+}
+
+// ══ 납품탭 거래처 직접 추가 ══
+function onExtraStoreSearch(){
+  const q = (document.getElementById('extra-store-q')?.value||'').trim();
+  const dd = document.getElementById('extra-store-dd');
+  if(!dd) return;
+  if(!q){ dd.style.display='none'; return; }
+  const _stores = typeof stores !== 'undefined' ? stores : [];
+  const matched = _stores.filter(s =>
+    s.이름.includes(q) &&
+    s.상태 !== '비활성' &&
+    !completedRoutes.includes(s.이름)
+  ).slice(0,8);
+  if(!matched.length){ dd.style.display='none'; return; }
+  dd.style.display='block';
+  dd.innerHTML = matched.map(s =>
+    `<div onclick="addToRoute('${s.이름.replace(/'/g,"\'")}');document.getElementById('extra-store-q').value='';document.getElementById('extra-store-dd').style.display='none';"
+      style="padding:10px 14px;cursor:pointer;font-size:13px;border-bottom:1px solid var(--border);">
+      ${s.이름}<span style="font-size:10px;color:var(--t3);margin-left:6px;">${s.유종||''}</span>
+    </div>`
+  ).join('');
+}
+
+function addToRoute(name){
+  if(!name) return;
+  const list = typeof getRouteList === 'function' ? getRouteList() : [];
+  if(list.includes(name)){ if(typeof showToast==='function') showToast('이미 루트에 있어요'); return; }
+  // routeOrder에 추가
+  if(typeof routeOrder !== 'undefined'){
+    if(!routeOrder.includes(name)) routeOrder.push(name);
+    if(typeof saveRouteOrder==='function') saveRouteOrder();
+  }
+  // cargo_today에도 추가 (상차 기록)
+  try{
+    const empName = typeof EMP !== 'undefined' ? EMP : '';
+    const cargos = JSON.parse(localStorage.getItem(`cargo_today_${empName}`)||'[]');
+    if(!cargos.find(c=>c.거래처===name)){
+      const s = typeof stores !== 'undefined' ? stores.find(x=>x.이름===name) : null;
+      cargos.push({거래처:name, 유종:s?.유종||'', 통수:0});
+      localStorage.setItem(`cargo_today_${empName}`, JSON.stringify(cargos));
+    }
+  }catch(e){}
+  if(typeof renderRoute==='function') renderRoute();
+  if(typeof showToast==='function') showToast(`${name} 루트 추가됨`);
 }

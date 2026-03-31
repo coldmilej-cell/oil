@@ -636,12 +636,16 @@ function toggleDay(id){document.getElementById(id).classList.toggle('show');}
 
 // ===== 자동배정 =====
 function updateAssignStats(){
+  if(!allStores || !allStores.length) return;
   const son=allStores.filter(s=>s.담당==='손호영').length;
   const bak=allStores.filter(s=>s.담당==='박기빈').length;
   const none=allStores.filter(s=>!s.담당||s.담당==='공유').length;
-  document.getElementById('as-son').textContent=son;
-  document.getElementById('as-bak').textContent=bak;
-  document.getElementById('as-none').textContent=none;
+  const sonEl=document.getElementById('as-son');
+  const bakEl=document.getElementById('as-bak');
+  const noneEl=document.getElementById('as-none');
+  if(sonEl) sonEl.textContent=son;
+  if(bakEl) bakEl.textContent=bak;
+  if(noneEl) noneEl.textContent=none;
 }
 
 async function runAutoAssign(){

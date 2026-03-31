@@ -1443,16 +1443,21 @@ function renderCheckinAddBtn(){
   history.insertAdjacentElement('afterend', btn);
 }
 
-const _origRenderCheckinHistory2 = typeof renderCheckinHistory === 'function' ? renderCheckinHistory : null;
-
-function renderCheckinHistory(){
-  if(_origRenderCheckinHistory2) _origRenderCheckinHistory2();
-  const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
-  const empName = typeof EMP !== 'undefined' ? EMP : '';
-  const logs = JSON.parse(localStorage.getItem(`checkin_log_${empName}_${t}`) || '[]');
-  if(logs.length > 0) setTimeout(renderCheckinAddBtn, 100);
-  renderCheckinDaySummary(logs);
-}
+// renderCheckinHistory 후처리 — 원본 함수 실행 후 추가 기능
+// (원본은 son.html에 있고, patch.js에서 직접 호출하지 않음)
+// DOMContentLoaded 후에 한 번 실행
+(function patchRenderCheckinHistory(){
+  const orig = typeof renderCheckinHistory === 'function' ? renderCheckinHistory : null;
+  if(!orig) return;
+  window.renderCheckinHistory = function(){
+    orig();
+    const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
+    const empName = typeof EMP !== 'undefined' ? EMP : '';
+    const logs = JSON.parse(localStorage.getItem('checkin_log_' + empName + '_' + t) || '[]');
+    if(logs.length > 0) setTimeout(renderCheckinAddBtn, 100);
+    renderCheckinDaySummary(logs);
+  };
+})();
 
 function renderCheckinDaySummary(logs){
   if(!logs || !logs.length) return;
@@ -1527,56 +1532,3 @@ function checkUrgentAssignments(){
   setTimeout(checkUrgentAssignments, 2000);
   setInterval(checkUrgentAssignments, 30000);
 })();
-
-// ══════════════ getRouteList 오버라이드 — 미배정=공유 ══════════════
-const _origGetRouteList = typeof getRouteList === 'function' ? getRouteList : null;
-
-function getRouteList(){
-  const savedCargos = JSON.parse(localStorage.getItem(`cargo_today_${EMP}`) || '[]');
-  const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
-  const dayStr = DAYS[new Date().getDay()];
-  const skipped = JSON.parse(localStorage.getItem(`skip_${EMP}_${t}`) || '[]');
-
-  // 배차된 거래처 (오늘 긴급배정)
-  const dispatched = (typeof stores !== 'undefined' ? stores : []).filter(s =>
-    s.배정상태 === '긴급배정' &&
-    s.배정날짜 === t &&
-    (s.배정직원 === EMP || s.담당 === EMP) &&
-    s.상태 !== '비활성'
-  ).map(s => s.이름);
-
-  // 내 담당 거래처
-  const myStores = (typeof stores !== 'undefined' ? stores : []).filter(s =>
-    s.상태 !== '비활성' &&
-    s.담당 === EMP &&
-    (!s.요일 || s.요일 === dayStr)
-  ).map(s => s.이름);
-
-  // 미배정(공유) 거래처 — 둘 다 볼 수 있음
-  const sharedStores = (typeof stores !== 'undefined' ? stores : []).filter(s =>
-    s.상태 !== '비활성' &&
-    (!s.담당 || s.담당 === '' || s.담당 === '공유') &&
-    (!s.요일 || s.요일 === dayStr)
-  ).map(s => s.이름);
-
-  // 타담당 거래처 (대리납품용)
-  const otherStores = (typeof stores !== 'undefined' ? stores : []).filter(s =>
-    s.상태 !== '비활성' &&
-    s.담당 && s.담당 !== EMP && s.담당 !== '공유' &&
-    s.요일 === dayStr
-  ).map(s => s.이름);
-
-  // 상차한 거래처
-  const cargoStores = savedCargos.filter(c => c.거래처).map(c => c.거래처);
-
-  const allNames = [...new Set([
-    ...dispatched, ...cargoStores, ...myStores, ...sharedStores, ...otherStores
-  ])].filter(n => !skipped.includes(n));
-
-  const ordered = [];
-  if(typeof routeOrder !== 'undefined'){
-    routeOrder.forEach(n => { if(allNames.includes(n)) ordered.push(n); });
-  }
-  allNames.forEach(n => { if(!ordered.includes(n)) ordered.push(n); });
-  return ordered;
-}

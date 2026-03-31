@@ -316,17 +316,46 @@ function renderCarryOver(){
     </div>`).join('');
 }
 
+// ══════════════ updateDailyBar — 납품완료 거래처 수 ══════════════
 function updateDailyBar(){
-  const savedCargos=JSON.parse(localStorage.getItem(`cargo_today_${EMP}`)||'[]'),t=today();
-  const loaded=savedCargos.reduce((s,c)=>s+(c.통수||0),0);
-  const doneTx=txList.filter(x=>x.날짜===t&&x.직원===EMP);
-  const doneQty=doneTx.reduce((s,x)=>s+Math.max(0,x.통수||0),0);
-  const remainQty=Math.max(0,loaded-doneQty);
-  const wasteKg=doneTx.reduce((s,x)=>s+(x.폐유kg||0),0);
-  const loadedEl=document.getElementById('bar-loaded'),doneRemEl=document.getElementById('bar-done-remain'),wasteEl=document.getElementById('bar-waste-kg');
-  if(loadedEl) loadedEl.textContent=loaded||'-';
-  if(doneRemEl) doneRemEl.innerHTML=`<span style="color:var(--g)">${doneQty}</span> / <span style="color:var(--t2)">${remainQty}</span>`;
-  if(wasteEl) wasteEl.textContent=wasteKg>0?wasteKg.toFixed(1):'-';
+  const barEl = document.getElementById('daily-bar');
+  if(!barEl) return;
+
+  const savedCargos = JSON.parse(localStorage.getItem('cargo_today_' + (typeof EMP !== 'undefined' ? EMP : '')) || '[]');
+  const route = typeof getRouteList === 'function' ? getRouteList() : [];
+  const completed = typeof completedRoutes !== 'undefined' ? completedRoutes : [];
+
+  // 납품완료 거래처 수
+  const doneCount = completed.filter(n => route.includes(n)).length;
+  const totalCount = route.length;
+  const remainCount = totalCount - doneCount;
+
+  // 납품한 총 통수 (오늘 tx)
+  const t = typeof today === 'function' ? today() : new Date().toISOString().slice(0,10);
+  const empName = typeof EMP !== 'undefined' ? EMP : '';
+  const todayTx = typeof txList !== 'undefined'
+    ? txList.filter(x => x.날짜 === t && x.직원 === empName)
+    : [];
+  const deliveredQty = todayTx.reduce((s, x) => s + (Math.abs(+x.통수) || 0), 0);
+  const remainQty = savedCargos.reduce((s, c) => {
+    if(!route.includes(c.거래처) || completed.includes(c.거래처)) return s;
+    return s + (c.통수 || 0);
+  }, 0);
+
+  // 폐유 수거 kg
+  const wasteKg = todayTx.reduce((s, x) => s + (+x.폐유kg || 0), 0);
+
+  const loadedEl = document.getElementById('bar-loaded');
+  const doneRemEl = document.getElementById('bar-done-remain');
+  const wasteEl = document.getElementById('bar-waste-kg');
+
+  if(loadedEl) loadedEl.textContent = doneCount;
+  if(doneRemEl){
+    doneRemEl.innerHTML = `<span style="color:var(--g)">${deliveredQty}</span> / <span style="color:var(--t2)">${remainQty}</span>`;
+  }
+  if(wasteEl) wasteEl.textContent = wasteKg > 0 ? wasteKg.toFixed(1) : '-';
+
+  barEl.style.display = totalCount > 0 ? 'block' : 'none';
 }
 
 async function loadStoreInfo(storeName){
@@ -370,6 +399,14 @@ async function saveNewStore(){
   try{const res=await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},body:JSON.stringify({type:'store_add',store})});const d=await res.json();if(d.ok===false){showToast('⚠️ '+d.error);return;}}catch(e){showToast('⚠️ 서버 저장 실패 - 로컬에만 추가');}
   stores.push(store);localStorage.setItem('stores_v3',JSON.stringify(stores));
   showToast(`✅ "${이름}" 추가됐어요!`);closeModal('new-store-modal');selectStore(이름);
+  // 루트 즉시 반영
+  if(typeof renderRoute==='function') renderRoute();
+  // boss 연동 — 신규배정 상태로 업데이트
+  try{
+    const t2 = typeof today==='function' ? today() : new Date().toISOString().slice(0,10);
+    await fetch(API,{method:'POST',headers:{'Content-Type':'text/plain'},
+      body:JSON.stringify({type:'store_update',store:{이름,배정상태:'신규배정',배정직원:EMP,배정날짜:t2}})});
+  }catch(e2){}
 }
 
 function renderPriceTab(){

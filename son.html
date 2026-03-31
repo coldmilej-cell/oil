@@ -229,16 +229,24 @@ select option{background:#181c24;}
       <div style="font-size:12px;font-weight:700;color:var(--g)" id="route-progress"></div>
     </div>
     <div id="route-list"></div>
-    <button class="btn-add" style="margin-top:4px;margin-bottom:60px" onclick="showDeliveryForm(null)">+ 신규 / 추가 납품</button>
+    <!-- 신규 거래처 등록 버튼 -->
+    <div style="display:flex;gap:8px;margin-top:8px;margin-bottom:60px;">
+      <button onclick="openNewStoreQuick()" style="flex:1;padding:11px;background:rgba(61,220,132,.08);border:1.5px solid var(--g);border-radius:11px;color:var(--g);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+        ➕ 신규 거래처 등록
+      </button>
+      <button onclick="showDeliveryForm(null)" style="flex:1;padding:11px;background:rgba(108,143,255,.08);border:1.5px solid var(--p);border-radius:11px;color:var(--p);font-size:13px;font-weight:700;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">
+        📦 추가 납품
+      </button>
+    </div>
   </div>
 
   <!-- 납품탭 하단 고정 현황바 -->
   <div id="daily-bar" style="position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:440px;background:var(--card);border-top:1px solid var(--border);padding:10px 16px;z-index:50;display:none">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
       <div>
-        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">📦 상차</div>
-        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--p)" id="bar-loaded">-</div>
-        <div style="font-size:9px;color:var(--t3)">통</div>
+        <div style="font-size:10px;color:var(--t3);margin-bottom:2px">🏪 납품완료</div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:700;color:var(--g)" id="bar-loaded">-</div>
+        <div style="font-size:9px;color:var(--t3)">곳</div>
       </div>
       <div>
         <div style="font-size:10px;color:var(--t3);margin-bottom:2px">✅납품 / 🔲잔여</div>
@@ -2523,6 +2531,25 @@ function showToast(msg){
 <script src="patch.js"></script>
 <script>
 init();
+// ══════════════ 납품탭 신규 거래처 빠른 등록 ══════════════
+function openNewStoreQuick(){
+  // 신규 거래처 모달 열기 (기존 모달 재사용)
+  const modal = document.getElementById('new-store-modal');
+  if(!modal){ openNewStore(''); return; }
+  // 서브 텍스트 설정
+  const sub = document.getElementById('ns-sub');
+  if(sub) sub.textContent = '등록 후 오늘 루트에 즉시 추가됩니다';
+  // 입력 초기화
+  ['ns-name','ns-phone','ns-payer','ns-account','ns-note'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value = '';
+  });
+  const dayEl = document.getElementById('ns-day');
+  if(dayEl) dayEl.value = '';
+  modal.classList.add('show');
+  setTimeout(()=>document.getElementById('ns-name')?.focus(), 300);
+}
+
 </script>
 </body>
 </html>

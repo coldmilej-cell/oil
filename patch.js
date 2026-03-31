@@ -202,13 +202,13 @@ function renderRoute(){
 
     return `<div class="route-item ${done?'done':''}" id="ri-${i}" data-name="${name}">
       <div class="route-order" style="background:${done?'var(--g)':'var(--p2)'};flex-shrink:0">${done?'✓':i+1}</div>
-      <div class="route-info" onclick="openDelivery('${name}')">
+      <div class="route-info" onclick="openDelivery('${name.replace(/'/g,"\'")}')" >
         <div class="route-name">${name}${crossLabel}${visitBadge}</div>
         <div class="route-meta" style="color:${cargo?'var(--o)':'var(--t2)'}">${meta}</div>
       </div>
       ${done
-        ?`<button onclick="deleteTxByStore('${name}')" style="padding:6px 10px;background:rgba(255,107,107,.12);border:none;border-radius:8px;color:var(--r);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">납품삭제</button>`
-        :`<button onclick="removeFromRoute('${name}')" style="padding:6px 10px;background:rgba(122,127,148,.12);border:none;border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">✕</button>`
+        ?`<button onclick="deleteTxByStore('${name.replace(/'/g,"\'")}')"  style="padding:6px 10px;background:rgba(255,107,107,.12);border:none;border-radius:8px;color:var(--r);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">납품삭제</button>`
+        :`<button onclick="removeFromRoute('${name.replace(/'/g,"\'")}')"  style="padding:6px 10px;background:rgba(122,127,148,.12);border:none;border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">✕</button>`
       }
       <div class="drag-handle" draggable="true" ondragstart="dragStart(event,'${name}')" ondragover="dragOver(event)" ondrop="dragDrop(event,'${name}')" ondragend="dragEnd(event)">⠿</div>
     </div>`;

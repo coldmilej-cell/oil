@@ -556,7 +556,7 @@ function renderRoute(){
         <div class="route-meta" style="color:${cargo ? 'var(--o)' : 'var(--t2)'}">${meta}</div>
       </div>
       ${done
-        ? `<button onclick="confirmDeleteTx('${name.replace(/'/g,\"\\'\")}')" style="padding:4px 8px;background:transparent;border:1px solid rgba(255,107,107,.3);border-radius:6px;color:rgba(255,107,107,.6);font-size:10px;cursor:pointer;flex-shrink:0">삭제</button>`
+        ? `<button onclick="confirmDeleteTx(this.closest('[data-name]').dataset.name)" style="padding:4px 8px;background:transparent;border:1px solid rgba(255,107,107,.3);border-radius:6px;color:rgba(255,107,107,.6);font-size:10px;cursor:pointer;flex-shrink:0">삭제</button>`
         : `<button onclick="removeFromRoute('${name}')" style="padding:6px 10px;background:rgba(122,127,148,.12);border:none;border-radius:8px;color:var(--t2);font-size:11px;font-weight:600;cursor:pointer;flex-shrink:0">✕</button>`
       }
       <div class="drag-handle" draggable="true"
